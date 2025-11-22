@@ -1,0 +1,14 @@
+name: waiter_app
+description: Waiter app for Tsar CRM
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+
+flutter:
+  uses-material-design: true
