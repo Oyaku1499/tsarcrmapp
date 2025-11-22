@@ -92,33 +92,6 @@ class ApiClient {
 
 // ---------- TABLES ----------
 
-class ApiTable {
-  final String id;
-  final String number;
-  final String? zone;
-  final int seats;
-  final String status;
-
-  ApiTable({
-    required this.id,
-    required this.number,
-    this.zone,
-    required this.seats,
-    required this.status,
-  });
-
-  factory ApiTable.fromJson(Map<String, dynamic> json) {
-    return ApiTable(
-      id: json['id'] as String,
-      number: json['number']?.toString() ?? '',
-      zone: json['zone'] as String?,
-      seats: (json['seats'] as num?)?.toInt() ?? 0,
-      status: json['status'] as String? ?? 'free',
-    );
-  }
-}
-
-extension TablesApi on ApiClient {
   Future<List<ApiTable>> getTables() async {
     final uri = _buildUri('/tables');
     final res = await http.get(uri, headers: _headers());
@@ -151,7 +124,6 @@ extension TablesApi on ApiClient {
         data['table'] as Map<String, dynamic>? ?? data; // на всякий случай
     return ApiTable.fromJson(tableJson);
   }
-}
 
   // ---------- MENU ----------
 
@@ -184,6 +156,34 @@ extension TablesApi on ApiClient {
   }
 }
 
+// ---------- TABLES ----------
+
+class ApiTable {
+  final String id;
+  final String number;
+  final String? zone;
+  final int seats;
+  final String status;
+
+  ApiTable({
+    required this.id,
+    required this.number,
+    this.zone,
+    required this.seats,
+    required this.status,
+  });
+
+  factory ApiTable.fromJson(Map<String, dynamic> json) {
+    return ApiTable(
+      id: json['id'] as String,
+      number: json['number']?.toString() ?? '',
+      zone: json['zone'] as String?,
+      seats: (json['seats'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'free',
+    );
+  }
+}
+
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
@@ -191,8 +191,7 @@ class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
 
   @override
-  String toString() =>
-      'ApiException(${statusCode ?? '-'}): $message';
+  String toString() => 'ApiException(${statusCode ?? '-'}): $message';
 }
 
 // ---------- MODELS -----------
