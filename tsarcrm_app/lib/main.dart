@@ -24,23 +24,40 @@ class WaiterApp extends StatefulWidget {
 
 class _WaiterAppState extends State<WaiterApp> {
   AuthUser? _user;
+  bool _isDarkMode = true;
 
   @override
   Widget build(BuildContext context) {
-    final theme = ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF4ADE80),
-        brightness: Brightness.dark,
-      ),
-      scaffoldBackgroundColor: const Color(0xFF050816),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF050816),
-        elevation: 0,
-      ),
-      cardColor: const Color(0xFF020617),
-    );
+    final theme = _isDarkMode
+        ? ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF4ADE80),
+              brightness: Brightness.dark,
+            ),
+            scaffoldBackgroundColor: const Color(0xFF050816),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF050816),
+              elevation: 0,
+            ),
+            cardColor: const Color(0xFF020617),
+          )
+        : ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFFFF8C3A),
+              brightness: Brightness.light,
+            ),
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFFFFFFFF),
+              elevation: 0,
+              foregroundColor: Colors.black,
+            ),
+            cardColor: const Color(0xFFFFFFFF),
+          );
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -54,6 +71,8 @@ class _WaiterAppState extends State<WaiterApp> {
           : HomeShell(
               apiClient: widget.apiClient,
               user: _user!,
+              isDarkMode: _isDarkMode,
+              onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
               onLogout: () => setState(() => _user = null),
             ),
     );
@@ -245,11 +264,15 @@ class HomeShell extends StatefulWidget {
     super.key,
     required this.apiClient,
     required this.user,
+    required this.isDarkMode,
+    required this.onToggleTheme,
     required this.onLogout,
   });
 
   final ApiClient apiClient;
   final AuthUser user;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
   final VoidCallback onLogout;
 
   @override
@@ -266,6 +289,8 @@ class _HomeShellState extends State<HomeShell> {
       MenuScreen(apiClient: widget.apiClient),
       ProfileScreen(
         user: widget.user,
+        isDarkMode: widget.isDarkMode,
+        onToggleTheme: widget.onToggleTheme,
         onLogout: widget.onLogout,
       ),
     ];
@@ -509,6 +534,7 @@ class _TablesScreenState extends State<TablesScreen> {
                     tableNumber: table.number,
                     orders: orders,
                     tableStatus: table.status,
+                    onChanged: _reload,
                   );
                 },
               );
@@ -528,16 +554,20 @@ class _TablesScreenState extends State<TablesScreen> {
     );
   }
 }
+
+
 class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.tableNumber,
     required this.orders,
     required this.tableStatus,
+    this.onChanged,
   });
 
   final String tableNumber;
   final List<ApiOrder> orders;
   final String tableStatus;
+  final VoidCallback? onChanged;
 
   String get _statusLabel {
     if (orders.isEmpty || tableNumber == '—') {
@@ -552,6 +582,7 @@ class _TableCard extends StatelessWidget {
           return 'Свободен';
       }
     }
+
     final hasNew = orders.any((o) => o.status == 'new');
     final hasPreparing = orders.any((o) => o.status == 'preparing');
     final hasWaiting =
@@ -575,28 +606,58 @@ class _TableCard extends StatelessWidget {
           return const Color(0xFF16A34A); // зелёный
       }
     }
+
     if (orders.any((o) => o.status == 'completed')) {
       return const Color(0xFFF97316);
     }
     return cs.primary;
   }
 
+  Future<void> _closeOrder(BuildContext context, ApiOrder order) async {
+    final apiClient = apiClientFromContext(context);
+    try {
+      await apiClient.deleteOrder(order.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Заказ ${order.id} закрыт')),
+      );
+      onChanged?.call();
+    } on ApiException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось закрыть заказ')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final totalGuests = orders.length; // можно позже заменить на реальное число
+
+    final totalGuests = orders.length;
+
+    ApiOrder? lastOrder;
+    if (orders.isNotEmpty) {
+      final sorted = [...orders]
+        ..sort(
+          (a, b) => b.createdAt.compareTo(a.createdAt),
+        );
+      lastOrder = sorted.first;
+    }
 
     return GestureDetector(
-onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => TableDetailsScreen(
-        apiClient: apiClientFromContext(context),
-        tableNumber: tableNumber,
-      ),
-    ),
-  );
-},
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TableDetailsScreen(
+              apiClient: apiClientFromContext(context),
+              tableNumber: tableNumber,
+            ),
+          ),
+        );
+      },
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF020617),
@@ -606,10 +667,11 @@ onTap: () {
             width: 1.1,
           ),
         ),
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // заголовок + статус
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -637,7 +699,8 @@ onTap: () {
                 ),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 6),
+            // краткая инфа по гостям / заказам
             Row(
               children: [
                 Icon(
@@ -647,9 +710,7 @@ onTap: () {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  totalGuests == 0
-                      ? 'Нет заказов'
-                      : '$totalGuests заказ(ов)',
+                  totalGuests == 0 ? 'Нет заказов' : '$totalGuests заказ(ов)',
                   style: TextStyle(
                     fontSize: 11,
                     color: cs.onSurfaceVariant,
@@ -657,7 +718,50 @@ onTap: () {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            if (lastOrder != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.surfaceVariant.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Заказ #${lastOrder.id}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Сумма: ${lastOrder.total.toStringAsFixed(0)} ₽',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => _closeOrder(context, lastOrder!),
+                        child: const Text('Закрыть заказ'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Text(
+                'Заказов пока нет',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.outline,
+                ),
+              ),
+            const Spacer(),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
@@ -671,16 +775,16 @@ onTap: () {
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-onPressed: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => TableDetailsScreen(
-        apiClient: apiClientFromContext(context),
-        tableNumber: tableNumber,
-      ),
-    ),
-  );
-},
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TableDetailsScreen(
+                        apiClient: apiClientFromContext(context),
+                        tableNumber: tableNumber,
+                      ),
+                    ),
+                  );
+                },
                 child: Text(
                   orders.isEmpty ? 'Новый заказ' : 'Открыть заказ',
                   style: const TextStyle(
@@ -696,6 +800,8 @@ onPressed: () {
     );
   }
 }
+
+
 
 // ----------------- MENU SCREEN -----------------
 
@@ -982,6 +1088,98 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 }
 
+class _MenuCategoryCard extends StatelessWidget {
+  const _MenuCategoryCard({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<MenuItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF020617),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF1E293B),
+          width: 1,
+        ),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          childrenPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          iconColor: cs.onSurfaceVariant,
+          collapsedIconColor: cs.onSurfaceVariant,
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+          children: [
+            for (final item in items)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  item.name,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                subtitle: Text(
+                  '${item.price.toStringAsFixed(0)} ₽',
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                trailing: FilledButton.tonal(
+                  onPressed: () {
+                    // TODO: добавить в текущий заказ
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Добавлено: ${item.name}')),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'В заказ',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ----------------- PROFILE SCREEN -----------------
 
 class ProfileScreen extends StatelessWidget {
@@ -1145,6 +1343,949 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
+  class TableDetailsScreen extends StatefulWidget {
+  const TableDetailsScreen({
+    super.key,
+    required this.apiClient,
+    required this.tableNumber,
+  });
+
+  final ApiClient apiClient;
+  final String tableNumber;
+
+  @override
+  State<TableDetailsScreen> createState() => _TableDetailsScreenState();
+}
+
+
+class _TableDetailsScreenState extends State<TableDetailsScreen> {
+  late Future<List<ApiOrder>> _ordersFuture;
+  late Future<ApiTable?> _tableFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    _ordersFuture = widget.apiClient.getOrders();
+    _tableFuture = _loadTable();
+  }
+
+  Future<ApiTable?> _loadTable() async {
+    try {
+      final tables = await widget.apiClient.getTables();
+      return tables.firstWhere((t) => t.number == widget.tableNumber);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(_reload);
+  }
+
+  Future<void> _openCreateOrderDialog() async {
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CreateOrderDialog(
+        apiClient: widget.apiClient,
+        tableNumber: widget.tableNumber,
+      ),
+    );
+    if (created == true) {
+      _refresh();
+    }
+  }
+
+  
+  Widget _buildReservationRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF9CA3AF),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+@override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Стол ${widget.tableNumber}'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            FutureBuilder<ApiTable?>(
+              future: _tableFuture,
+              builder: (context, tsnap) {
+                final table = tsnap.data;
+                final reservation = table?.reservation;
+                final isReserved =
+                    (table?.status == 'reserved') || reservation != null;
+
+                if (!isReserved) {
+                  return const SizedBox.shrink();
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF020617),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Бронь',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (reservation != null) ...[
+                        _buildReservationRow(
+                          'Дата и время',
+                          reservation.dateTimeDisplay,
+                        ),
+                        _buildReservationRow(
+                          'Имя',
+                          reservation.name ?? 'Не указано',
+                        ),
+                        _buildReservationRow(
+                          'Контакты',
+                          reservation.contacts ?? 'Не указано',
+                        ),
+                        _buildReservationRow(
+                          'Количество гостей',
+                          reservation.guests != null
+                              ? reservation.guests.toString()
+                              : 'Не указано',
+                        ),
+                        _buildReservationRow(
+                          'Предзаказ',
+                          (reservation.preOrder?.isNotEmpty ?? false)
+                              ? reservation.preOrder!
+                              : 'Нет',
+                        ),
+                      ] else
+                        const Text(
+                          'Информация о брони недоступна',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Текущие заказы',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            FutureBuilder<List<ApiOrder>>(
+              future: _ordersFuture,
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snap.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'Ошибка загрузки заказов',
+                      style: TextStyle(color: cs.error),
+                    ),
+                  );
+                }
+                final orders = snap.data ?? const [];
+                final tableOrders = orders
+                    .where((o) => (o.tableNumber ?? '') == widget.tableNumber)
+                    .toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+                if (tableOrders.isEmpty) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF020617),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: const Text(
+                      'Пока нет заказов для этого стола',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    for (final o in tableOrders)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF020617),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF1E293B)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Заказ #${o.id}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Статус: ${o.status}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF9CA3AF),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Создан: ${o.createdAt.toLocal()}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${o.total.toStringAsFixed(0)} ₽',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Создание заказа',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Откройте модальное окно, чтобы добавить позиции и блюда в заказ.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.outline,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openCreateOrderDialog,
+                icon: const Icon(Icons.shopping_cart_outlined),
+                label: const Text('Создать заказ'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class _PositionItem {
+  _PositionItem({required this.menuItem, this.quantity = 1});
+
+  final MenuItem menuItem;
+  int quantity;
+
+  double get total => menuItem.price * quantity;
+}
+
+class _OrderPositionModel {
+  _OrderPositionModel({required this.index});
+
+  final int index;
+  final List<_PositionItem> items = [];
+}
+
+class _MenuSelection {
+  _MenuSelection({required this.menuItem, required this.quantity});
+
+  final MenuItem menuItem;
+  final int quantity;
+}
+
+class _CreateOrderDialog extends StatefulWidget {
+  const _CreateOrderDialog({
+    super.key,
+    required this.apiClient,
+    required this.tableNumber,
+  });
+
+  final ApiClient apiClient;
+  final String tableNumber;
+
+  @override
+  State<_CreateOrderDialog> createState() => _CreateOrderDialogState();
+}
+
+class _CreateOrderDialogState extends State<_CreateOrderDialog> {
+  final List<_OrderPositionModel> _positions = [
+    _OrderPositionModel(index: 1),
+  ];
+  bool _submitting = false;
+  String? _error;
+
+  double get _total {
+    double sum = 0;
+    for (final pos in _positions) {
+      for (final item in pos.items) {
+        sum += item.total;
+      }
+    }
+    return sum;
+  }
+
+  Future<void> _addItemsToPosition(int index) async {
+    final result = await showDialog<List<_MenuSelection>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _MenuPickerDialog(apiClient: widget.apiClient),
+    );
+    if (result == null || result.isEmpty) return;
+
+    setState(() {
+      final position = _positions.firstWhere((p) => p.index == index);
+      for (final sel in result) {
+        final existing = position.items
+            .where((i) => i.menuItem.id == sel.menuItem.id)
+            .toList();
+        if (existing.isEmpty) {
+          position.items.add(
+            _PositionItem(menuItem: sel.menuItem, quantity: sel.quantity),
+          );
+        } else {
+          existing.first.quantity += sel.quantity;
+        }
+      }
+    });
+  }
+
+  void _addPosition() {
+    setState(() {
+      _positions.add(
+        _OrderPositionModel(index: _positions.length + 1),
+      );
+    });
+  }
+
+  void _removeItem(_OrderPositionModel pos, _PositionItem item) {
+    setState(() {
+      pos.items.remove(item);
+    });
+  }
+
+  Future<void> _submit() async {
+    final Map<String, int> totals = {};
+    for (final pos in _positions) {
+      for (final item in pos.items) {
+        totals[item.menuItem.id] =
+            (totals[item.menuItem.id] ?? 0) + item.quantity;
+      }
+    }
+    if (totals.isEmpty) {
+      setState(() {
+        _error = 'Добавьте хотя бы одно блюдо';
+      });
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _submitting = true;
+    });
+
+    try {
+      final items = totals.entries
+          .map(
+            (e) => CreateOrderItem(
+              menuItemId: e.key,
+              quantity: e.value,
+            ),
+          )
+          .toList();
+      final payload = CreateOrderPayload(
+        customerName: 'Стол ${widget.tableNumber}',
+        table: widget.tableNumber,
+        items: items,
+      );
+
+      final res = await widget.apiClient.createOrder(payload);
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Заказ ${res.order.id} создан • ${res.order.total.toStringAsFixed(0)} ₽',
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.message;
+      });
+    } catch (_) {
+      setState(() {
+        _error = 'Не удалось создать заказ';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Заказ для стола ${widget.tableNumber}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed:
+                        _submitting ? null : () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: cs.error, fontSize: 13),
+                  ),
+                ),
+              Expanded(
+                child: ListView(
+                  children: [
+                    for (final pos in _positions) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildPositionCard(pos),
+                      ),
+                    ],
+                    TextButton.icon(
+                      onPressed: _addPosition,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Добавить позицию'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Общая сумма: ${_total.toStringAsFixed(0)} ₽',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Создать заказ'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPositionCard(_OrderPositionModel pos) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surface.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outline.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Позиция ${pos.index}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (pos.items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Пока нет блюд',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            )
+          else
+            ...pos.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.menuItem.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${item.quantity} x ${item.menuItem.price.toStringAsFixed(0)} ₽ = ${item.total.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      color: Theme.of(context).colorScheme.error,
+                      onPressed: () => _removeItem(pos, item),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _addItemsToPosition(pos.index),
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить блюдо...'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuPickerDialog extends StatefulWidget {
+  const _MenuPickerDialog({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
+
+  @override
+  State<_MenuPickerDialog> createState() => _MenuPickerDialogState();
+}
+
+class _MenuPickerDialogState extends State<_MenuPickerDialog> {
+  late Future<MenuResponse> _future;
+  final Map<String, int> _selectedQty = {};
+  String _search = '';
+  String? _selectedCategoryId;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.apiClient.getMenu();
+  }
+
+  int get _totalSelected =>
+      _selectedQty.values.fold(0, (prev, e) => prev + e);
+
+  void _changeQty(String id, int delta) {
+    setState(() {
+      final current = _selectedQty[id] ?? 0;
+      final next = (current + delta).clamp(0, 99);
+      if (next == 0) {
+        _selectedQty.remove(id);
+      } else {
+        _selectedQty[id] = next;
+      }
+    });
+  }
+
+  List<_MenuSelection> _buildResult(MenuResponse menu) {
+    final Map<String, MenuItem> byId = {
+      for (final item in menu.items) item.id: item,
+    };
+    final List<_MenuSelection> result = [];
+    _selectedQty.forEach((id, qty) {
+      final item = byId[id];
+      if (item != null && qty > 0) {
+        result.add(_MenuSelection(menuItem: item, quantity: qty));
+      }
+    });
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Выбор блюда',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Поиск блюда...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  isDense: true,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _search = value.trim().toLowerCase();
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedCategoryId = null;
+                        });
+                      },
+                      child: const Text('Полное меню'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final menu = await _future;
+                        final categories = menu.categories;
+                        if (!mounted) return;
+                        final selected = await showDialog<String>(
+                          context: context,
+                          builder: (context) {
+                            return Dialog(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text(
+                                      'Выберите категорию',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const Divider(height: 1),
+                                  Flexible(
+                                    child: ListView(
+                                      shrinkWrap: true,
+                                      children: [
+                                        for (final cat in categories)
+                                          ListTile(
+                                            title: Text(cat.name),
+                                            onTap: () => Navigator.of(context)
+                                                .pop(cat.id),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                        if (selected != null) {
+                          setState(() {
+                            _selectedCategoryId = selected;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.tune),
+                      label: const Text('Категории'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: FutureBuilder<MenuResponse>(
+                  future: _future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    if (snapshot.hasError || !snapshot.hasData) {
+                      return const Center(
+                        child: Text('Не удалось загрузить меню'),
+                      );
+                    }
+                    final menu = snapshot.data!;
+                    final items = menu.items.where((item) {
+                      if (!item.isActive || item.status == 'hidden') {
+                        return false;
+                      }
+                      if (_selectedCategoryId != null &&
+                          item.categoryId != _selectedCategoryId) {
+                        return false;
+                      }
+                      if (_search.isNotEmpty &&
+                          !item.name.toLowerCase().contains(_search)) {
+                        return false;
+                      }
+                      return true;
+                    }).toList();
+
+                    if (items.isEmpty) {
+                      return const Center(
+                        child: Text('Блюда не найдены'),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final qty = _selectedQty[item.id] ?? 0;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: cs.surface.withOpacity(0.5),
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(Icons.image_outlined),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            item.category.isNotEmpty
+                                                ? item.category
+                                                : 'Без категории',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: cs.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${item.price.toStringAsFixed(0)} ₽',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.remove_circle_outline),
+                                      onPressed: qty > 0
+                                          ? () => _changeQty(item.id, -1)
+                                          : null,
+                                    ),
+                                    Text('$qty'),
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.add_circle_outline),
+                                      onPressed: () => _changeQty(item.id, 1),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _totalSelected == 0
+                      ? null
+                      : () async {
+                          final menu = await _future;
+                          final result = _buildResult(menu);
+                          if (!mounted) return;
+                          Navigator.of(context).pop(result);
+                        },
+                  child: Text('Добавить ($_totalSelected)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ProfileInfoRow extends StatelessWidget {
   const _ProfileInfoRow({
@@ -1186,289 +2327,6 @@ class _ProfileInfoRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ----------------- TABLE DETAILS SCREEN -----------------
-
-class TableDetailsScreen extends StatefulWidget {
-  const TableDetailsScreen({
-    super.key,
-    required this.apiClient,
-    required this.tableNumber,
-  });
-
-  final ApiClient apiClient;
-  final String tableNumber;
-
-  @override
-  State<TableDetailsScreen> createState() => _TableDetailsScreenState();
-}
-
-class _TableDetailsScreenState extends State<TableDetailsScreen> {
-  late Future<List<ApiOrder>> _ordersFuture;
-  late Future<MenuResponse> _menuFuture;
-  final Map<String, int> _selectedQty = {};
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _reloadAll();
-  }
-
-  void _reloadAll() {
-    _ordersFuture = widget.apiClient.getOrders();
-    _menuFuture = widget.apiClient.getMenu();
-  }
-
-  Future<void> _refresh() async {
-    setState(_reloadAll);
-  }
-
-  Future<void> _submitOrder() async {
-    final items = <CreateOrderItem>[];
-    _selectedQty.forEach((id, qty) {
-      if (qty > 0) {
-        items.add(CreateOrderItem(menuItemId: id, quantity: qty));
-      }
-    });
-
-    if (items.isEmpty) {
-      setState(() {
-        _error = 'Добавьте блюда в заказ';
-      });
-      return;
-    }
-
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-
-    try {
-      final payload = CreateOrderPayload(
-        customerName: 'Стол ${widget.tableNumber}',
-        table: widget.tableNumber,
-        items: items,
-      );
-
-      final res = await widget.apiClient.createOrder(payload);
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Заказ ${res.order.id} создан')),
-      );
-
-      setState(() {
-        _selectedQty.clear();
-      });
-      await _refresh();
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } catch (_) {
-      setState(() => _error = 'Не удалось создать заказ');
-    } finally {
-      if (mounted) {
-        setState(() => _submitting = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Стол ${widget.tableNumber}'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Text(
-              'Текущие заказы',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            FutureBuilder<List<ApiOrder>>(
-              future: _ordersFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Text(
-                    'Ошибка загрузки заказов',
-                    style: TextStyle(color: cs.error),
-                  );
-                }
-                final orders = snapshot.data
-                        ?.where((o) =>
-                            (o.tableNumber ?? '') == widget.tableNumber)
-                        .toList() ??
-                    [];
-                if (orders.isEmpty) {
-                  return const Text('Для этого стола ещё нет заказов');
-                }
-                return Column(
-                  children: orders.map((o) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              o.customerName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${o.total.toStringAsFixed(0)} ₽',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Новый заказ',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            FutureBuilder<MenuResponse>(
-              future: _menuFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Text(
-                    'Ошибка загрузки меню',
-                    style: TextStyle(color: cs.error),
-                  );
-                }
-                final menu = snapshot.data;
-                if (menu == null || menu.items.isEmpty) {
-                  return const Text('Меню пусто');
-                }
-
-                final items = menu.items
-                    .where((i) => i.isActive && i.status != 'hidden')
-                    .toList();
-
-                return Column(
-                  children: items.map((item) {
-                    final qty = _selectedQty[item.id] ?? 0;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${item.price.toStringAsFixed(0)} ₽',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: qty > 0
-                                ? () {
-                                    setState(() {
-                                      final current =
-                                          _selectedQty[item.id] ?? 0;
-                                      if (current > 1) {
-                                        _selectedQty[item.id] = current - 1;
-                                      } else {
-                                        _selectedQty.remove(item.id);
-                                      }
-                                    });
-                                  }
-                                : null,
-                          ),
-                          Text('$qty'),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () {
-                              setState(() {
-                                _selectedQty[item.id] = qty + 1;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: TextStyle(color: cs.error),
-              ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _submitting ? null : _submitOrder,
-                child: _submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Создать заказ'),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
