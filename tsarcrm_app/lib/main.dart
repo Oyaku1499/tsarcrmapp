@@ -612,6 +612,7 @@ class _TablesScreenState extends State<TablesScreen> {
                       return _TableCard(
                         tableNumber: table.number,
                         orders: orders,
+                        seats: table.seats,
                         tableStatus: table.status,
                         reservation: table.reservation,
                         onChanged: _reload,
@@ -643,6 +644,7 @@ class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.tableNumber,
     required this.orders,
+    required this.seats,
     required this.tableStatus,
     this.reservation,
     this.onChanged,
@@ -650,6 +652,7 @@ class _TableCard extends StatelessWidget {
 
   final String tableNumber;
   final List<ApiOrder> orders;
+  final int seats;
   final String tableStatus;
   final TableReservation? reservation;
   final VoidCallback? onChanged;
@@ -719,7 +722,7 @@ class _TableCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final totalGuests = orders.length;
+    final orderCount = orders.length;
 
     ApiOrder? lastOrder;
     if (orders.isNotEmpty) {
@@ -807,9 +810,12 @@ class _TableCard extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.event_seat_outlined, size: 16),
+
                               const SizedBox(width: 6),
                               Text(
-                                '${reservation != null ? 'Бронь' : 'Мест'}: ${reservation != null ? reservation!.guests ?? '-' : '2-4'}',
+                                reservation != null
+                                    ? 'Бронь: ${reservation!.guests ?? '-'} гостей'
+                                    : '$seats мест',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: cs.onSurfaceVariant,
@@ -826,7 +832,7 @@ class _TableCard extends StatelessWidget {
                           ? 'Бронь на ${reservation!.dateTimeDisplay}'
                           : 'Статус: $_statusLabel',
                       style: TextStyle(
-                        fontSize: 1,
+                        fontSize: 12,
                         color: cs.onSurfaceVariant,
                       ),
                       maxLines: 1,
@@ -850,9 +856,9 @@ class _TableCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    totalGuests == 0
+                    orderCount == 0
                         ? 'Заказов пока нет'
-                        : '$totalGuests активных заказа',
+                         : '$orderCount активных заказов',
                     style: TextStyle(
                       fontSize: 12,
                       color: cs.onSurfaceVariant,
