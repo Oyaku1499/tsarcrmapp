@@ -25,113 +25,27 @@ class WaiterApp extends StatefulWidget {
 class _WaiterAppState extends State<WaiterApp> {
   AuthUser? _user;
 
-   ThemeMode _mode = ThemeMode.dark;
-
-  ThemeData _buildLightTheme() {
-    const seed = Color(0xFFF97316);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.light,
-      background: const Color(0xFFF7F7FB),
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-       brightness: Brightness.light,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.background,
-      cardColor: Colors.white,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        selectedItemColor: seed,
-        unselectedItemColor: scheme.outline,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 8,
-        indicatorColor: seed.withOpacity(0.12),
-        labelTextStyle:
-            WidgetStatePropertyAll(TextStyle(color: seed, fontSize: 12)),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outline.withOpacity(0.3)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outline.withOpacity(0.3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: seed, width: 1.4),
-        ),
-      ),
-    );
-  }
-
-  ThemeData _buildDarkTheme() {
-    const seed = Color(0xFFF97316);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.dark,
-      background: const Color(0xFF0B1627),
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.background,
-      cardColor: const Color(0xFF0F1C2E),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF0F1C2E),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-         centerTitle: true,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF0F1C2E),
-        elevation: 10,
-        indicatorColor: seed.withOpacity(0.18),
-        labelTextStyle:
-            WidgetStatePropertyAll(TextStyle(color: seed, fontSize: 12)),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFF142336),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: seed, width: 1.4),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF4ADE80),
+        brightness: Brightness.dark,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF050816),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF050816),
+        elevation: 0,
+      ),
+      cardColor: const Color(0xFF020617),
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Tsar Waiter',
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(),
-      themeMode: _mode,
+      theme: theme,
       home: _user == null
           ? LoginScreen(
               apiClient: widget.apiClient,
@@ -141,8 +55,6 @@ class _WaiterAppState extends State<WaiterApp> {
               apiClient: widget.apiClient,
               user: _user!,
               onLogout: () => setState(() => _user = null),
-              themeMode: _mode,
-              onThemeModeChanged: (mode) => setState(() => _mode = mode),
             ),
     );
   }
@@ -334,15 +246,11 @@ class HomeShell extends StatefulWidget {
     required this.apiClient,
     required this.user,
     required this.onLogout,
-    required this.themeMode,
-    required this.onThemeModeChanged,
   });
 
   final ApiClient apiClient;
   final AuthUser user;
   final VoidCallback onLogout;
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -359,8 +267,6 @@ class _HomeShellState extends State<HomeShell> {
       ProfileScreen(
         user: widget.user,
         onLogout: widget.onLogout,
-        themeMode: widget.themeMode,
-        onThemeModeChanged: widget.onThemeModeChanged,
       ),
     ];
 
@@ -418,100 +324,234 @@ class TablesScreen extends StatefulWidget {
   State<TablesScreen> createState() => _TablesScreenState();
 }
 
+
+class _TablesData {
+  final List<ApiTable> tables;
+  final List<ApiOrder> orders;
+
+  _TablesData(this.tables, this.orders);
+}
+
 class _TablesScreenState extends State<TablesScreen> {
-  late Future<List<ApiOrder>> _future;
+  late Future<_TablesData> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.apiClient.getOrders();
+    _future = _load();
+  }
+
+  Future<_TablesData> _load() async {
+    final results = await Future.wait([
+      widget.apiClient.getTables(),
+      widget.apiClient.getOrders(),
+    ]);
+    return _TablesData(
+      results[0] as List<ApiTable>,
+      results[1] as List<ApiOrder>,
+    );
   }
 
   Future<void> _reload() async {
     setState(() {
-      _future = widget.apiClient.getOrders();
+      _future = _load();
     });
+  }
+
+  Future<void> _showAddTableDialog() async {
+    final numberCtrl = TextEditingController();
+    final zoneCtrl = TextEditingController();
+    final seatsCtrl = TextEditingController(text: '2');
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Новый стол'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: numberCtrl,
+                  decoration: const InputDecoration(labelText: 'Номер стола'),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Укажите номер' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: zoneCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Зона (зал, терраса...)'),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Укажите зону' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: seatsCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration:
+                      const InputDecoration(labelText: 'Количество мест'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Создать'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (ok != true) return;
+
+    final seats = int.tryParse(seatsCtrl.text) ?? 2;
+
+    try {
+      await widget.apiClient.createTable(
+        number: numberCtrl.text.trim(),
+        zone: zoneCtrl.text.trim(),
+        seats: seats,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Стол создан')),
+      );
+      _reload();
+    } on ApiException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось создать стол')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _reload,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<List<ApiOrder>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return ListView(
-                children: [
-                  const SizedBox(height: 80),
-                  Center(
-                    child: Text(
-                      'Ошибка загрузки заказов',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+    final cs = Theme.of(context).colorScheme;
+
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: _reload,
+          child: FutureBuilder<_TablesData>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return ListView(
+                  children: [
+                    const SizedBox(height: 80),
+                    Center(
+                      child: Text(
+                        'Ошибка загрузки столов',
+                        style: TextStyle(color: cs.error),
                       ),
                     ),
-                  ),
-                ],
-              );
-            }
-            final orders = snapshot.data ?? [];
-            // Группируем по номеру стола
-            final Map<String, List<ApiOrder>> byTable = {};
-            for (final o in orders) {
-              final key = o.tableNumber ?? '—';
-              byTable.putIfAbsent(key, () => []).add(o);
-            }
-            final entries = byTable.entries.toList()
-              ..sort((a, b) => a.key.compareTo(b.key));
-
-             return LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = (constraints.maxWidth / 220)
-                    .clamp(2, 4)
-                    .toInt();
-
-                return GridView.builder(
-                  itemCount: entries.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.95,
-                  ),
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return _TableCard(
-                      tableNumber: entry.key,
-                      orders: entry.value,
-                    );
-                  },
+                  ],
                 );
-              },
-            );
-          },
+              }
+              final data = snapshot.data;
+              if (data == null || data.tables.isEmpty) {
+                return ListView(
+                  children: const [
+                    SizedBox(height: 80),
+                    Center(child: Text('Столов пока нет')),
+                  ],
+                );
+              }
+
+              final byTable = <String, List<ApiOrder>>{};
+              for (final o in data.orders) {
+                final key = o.tableNumber ?? '';
+                if (key.isEmpty) continue;
+                byTable.putIfAbsent(key, () => []).add(o);
+              }
+
+              final tables = [...data.tables]
+                ..sort((a, b) {
+                  final an = int.tryParse(a.number);
+                  final bn = int.tryParse(b.number);
+                  if (an != null && bn != null) return an.compareTo(bn);
+                  return a.number.compareTo(b.number);
+                });
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: tables.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.9,
+                ),
+                itemBuilder: (context, index) {
+                  final table = tables[index];
+                  final orders = byTable[table.number] ?? const [];
+                  return _TableCard(
+                    tableNumber: table.number,
+                    orders: orders,
+                    tableStatus: table.status,
+                  );
+                },
+              );
+            },
+          ),
         ),
-      ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton.extended(
+            onPressed: _showAddTableDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('Новый стол'),
+          ),
+        ),
+      ],
     );
   }
 }
-
 class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.tableNumber,
     required this.orders,
+    required this.tableStatus,
   });
 
   final String tableNumber;
   final List<ApiOrder> orders;
+  final String tableStatus;
 
   String get _statusLabel {
-    if (orders.isEmpty || tableNumber == '—') return 'Свободен';
+    if (orders.isEmpty || tableNumber == '—') {
+      // если заказов нет — используем статус стола из CRM
+      switch (tableStatus) {
+        case 'reserved':
+          return 'Забронирован';
+        case 'busy':
+          return 'Занят';
+        case 'free':
+        default:
+          return 'Свободен';
+      }
+    }
     final hasNew = orders.any((o) => o.status == 'new');
     final hasPreparing = orders.any((o) => o.status == 'preparing');
     final hasWaiting =
@@ -525,7 +565,15 @@ class _TableCard extends StatelessWidget {
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (orders.isEmpty || tableNumber == '—') {
-      return const Color(0xFF16A34A);
+      switch (tableStatus) {
+        case 'reserved':
+          return const Color(0xFFFACC15); // жёлтый
+        case 'busy':
+          return const Color(0xFFEF4444); // красный
+        case 'free':
+        default:
+          return const Color(0xFF16A34A); // зелёный
+      }
     }
     if (orders.any((o) => o.status == 'completed')) {
       return const Color(0xFFF97316);
@@ -539,33 +587,26 @@ class _TableCard extends StatelessWidget {
     final totalGuests = orders.length; // можно позже заменить на реальное число
 
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TableDetailsScreen(
-              apiClient: apiClientFromContext(context),
-              tableNumber: tableNumber,
-            ),
-          ),
-        );
-      },
+onTap: () {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => TableDetailsScreen(
+        apiClient: apiClientFromContext(context),
+        tableNumber: tableNumber,
+      ),
+    ),
+  );
+},
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: const Color(0xFF020617),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: _statusColor(context).withOpacity(0.45),
-            width: 1,
+            color: _statusColor(context).withOpacity(0.6),
+            width: 1.1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
-         padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -575,21 +616,21 @@ class _TableCard extends StatelessWidget {
                 Text(
                   tableNumber == '—' ? 'Без стола' : 'Стол $tableNumber',
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
                   ),
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _statusColor(context).withOpacity(0.15),
+                    color: _statusColor(context).withOpacity(0.18),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     _statusLabel,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       color: _statusColor(context),
                     ),
                   ),
@@ -600,47 +641,51 @@ class _TableCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.event_seat_outlined,
-                  size: 18,
+                  Icons.person_outline,
+                  size: 16,
                   color: cs.onSurfaceVariant,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Text(
                   totalGuests == 0
                       ? 'Нет заказов'
                       : '$totalGuests заказ(ов)',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  side: BorderSide(
+                    color: cs.primary.withOpacity(0.6),
+                    width: 0.9,
+                  ),
                   shape: RoundedRectangleBorder(
-                     borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TableDetailsScreen(
-                        apiClient: apiClientFromContext(context),
-                        tableNumber: tableNumber,
-                      ),
-                    ),
-                  );
-                },
+onPressed: () {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => TableDetailsScreen(
+        apiClient: apiClientFromContext(context),
+        tableNumber: tableNumber,
+      ),
+    ),
+  );
+},
                 child: Text(
-                  orders.isEmpty ? 'Создать заказ' : 'Открыть заказ',
+                  orders.isEmpty ? 'Новый заказ' : 'Открыть заказ',
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -665,6 +710,8 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   late Future<MenuResponse> _future;
+  String _selectedCategoryId = 'all';
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -686,11 +733,11 @@ class _MenuScreenState extends State<MenuScreen> {
       onRefresh: _reload,
       child: FutureBuilder<MenuResponse>(
         future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
+          if (snapshot.hasError) {
             return ListView(
               children: [
                 const SizedBox(height: 80),
@@ -703,135 +750,233 @@ class _MenuScreenState extends State<MenuScreen> {
               ],
             );
           }
-          final menu = snap.data;
+
+          final menu = snapshot.data;
           if (menu == null) {
             return ListView(
               children: const [
                 SizedBox(height: 80),
-                Center(child: Text('Меню пустое')),
+                Center(child: Text('Меню пусто')),
               ],
             );
           }
 
-          final byCategory = <String, List<MenuItem>>{};
-          for (final item in menu.items) {
-            if (!item.isActive || item.status == 'hidden') continue;
-            byCategory.putIfAbsent(item.category, () => []).add(item);
-          }
+          final activeItems = menu.items.where((item) {
+            if (!item.isActive || item.status == 'hidden') return false;
+            return true;
+          }).toList();
 
-          final categories = byCategory.entries.toList();
+          List<MenuItem> filtered = activeItems.where((item) {
+            final matchesCategory =
+                _selectedCategoryId == 'all' ||
+                item.categoryId == _selectedCategoryId;
+            final matchesSearch = _searchQuery.isEmpty ||
+                item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+          }).toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              final entry = categories[index];
-              return _MenuCategoryCard(
-                title: entry.key,
-                items: entry.value,
-              );
-            },
+          filtered.sort((a, b) => a.name.compareTo(b.name));
+
+          final selectedCategoryName = _selectedCategoryId == 'all'
+              ? 'Категории'
+              : (menu.categories
+                      .firstWhere(
+                        (c) => c.id == _selectedCategoryId,
+                        orElse: () => MenuCategory(
+                          id: '',
+                          name: 'Категория',
+                          description: '',
+                        ),
+                      )
+                      .name);
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              Text(
+                'Меню',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Поиск блюда…',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() => _selectedCategoryId = 'all');
+                      },
+                      child: const Text('Полное меню'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (menu.categories.isEmpty) return;
+                        final selected = await showDialog<String>(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Выберите категорию'),
+                              content: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (final c in menu.categories)
+                                      Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        width: double.infinity,
+                                        child: OutlinedButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(c.id),
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(c.name),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop('all'),
+                                  child: const Text('Сбросить'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(null),
+                                  child: const Text('Отмена'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        if (selected != null) {
+                          setState(() => _selectedCategoryId = selected);
+                        }
+                      },
+                      icon: const Icon(Icons.filter_list),
+                      label: Text(selectedCategoryName),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: Center(
+                    child: Text(
+                      'Блюда не найдены',
+                      style: TextStyle(
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...filtered.map((item) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          margin: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.image_outlined),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                                right: 12, top: 12, bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    item.category.isNotEmpty
+                                        ? item.category
+                                        : 'Категория',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'В наличии: ${item.stockQuantity}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color:
+                                        cs.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Text(
+                            '${item.price.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+            ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _MenuCategoryCard extends StatelessWidget {
-  const _MenuCategoryCard({
-    required this.title,
-    required this.items,
-  });
-
-  final String title;
-  final List<MenuItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cs.outlineVariant,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          )
-        ],
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          childrenPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          iconColor: cs.onSurfaceVariant,
-          collapsedIconColor: cs.onSurfaceVariant,
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-            ),
-          ),
-          children: [
-            for (final item in items)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  item.name,
-                  style: const TextStyle(fontSize: 14),
-                ),
-                subtitle: Text(
-                  '${item.price.toStringAsFixed(0)} ₽',
-                  style: TextStyle(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                trailing: FilledButton(
-                  onPressed: () {
-                    // TODO: добавить в текущий заказ
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Добавлено: ${item.name}')),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'В заказ',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
       ),
     );
   }
@@ -843,15 +988,15 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
     super.key,
     required this.user,
+    required this.isDarkMode,
+    required this.onToggleTheme,
     required this.onLogout,
-    required this.themeMode,
-    required this.onThemeModeChanged,
   });
 
   final AuthUser user;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
   final VoidCallback onLogout;
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -862,75 +1007,83 @@ class ProfileScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Профиль',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: cs.outlineVariant,
-                width: 1,
-              ),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                )
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
-            child: Row(
+            child: Column(
               children: [
                 CircleAvatar(
-                  radius: 26,
-                  backgroundColor: cs.primary.withOpacity(0.18),
-                  child: const Icon(Icons.person, size: 30),
+                  radius: 32,
+                  backgroundColor: cs.primary.withOpacity(0.15),
+                  child: Icon(
+                    Icons.person,
+                    size: 32,
+                    color: cs.primary,
+                  ),
                 ),
-                const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.fullName.isEmpty ? user.username : user.fullName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user.roleName,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                Text(
+                  user.fullName.isNotEmpty ? user.fullName : user.username,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user.roleName.isNotEmpty ? user.roleName : user.role,
+                  style: TextStyle(
+                    color: cs.onSurface.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                _ProfileInfoRow(
+                  icon: Icons.mail_outline,
+                  label: 'Email',
+                  value: user.email ?? 'Не указан',
+                ),
+                const SizedBox(height: 8),
+                _ProfileInfoRow(
+                  icon: Icons.badge_outlined,
+                  label: 'Логин',
+                  value: user.username,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: cs.outlineVariant),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
-                )
-              ],
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
                 Icon(
-                  themeMode == ThemeMode.dark
-                      ? Icons.dark_mode_outlined
-                      : Icons.light_mode_outlined,
+                  isDarkMode ? Icons.dark_mode : Icons.light_mode,
                   color: cs.primary,
                 ),
                 const SizedBox(width: 12),
@@ -940,26 +1093,21 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       const Text(
                         'Тема оформления',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        themeMode == ThemeMode.dark
-                            ? 'Тёмная'
-                            : 'Светлая',
-                        style: TextStyle(color: cs.onSurfaceVariant),
+                        isDarkMode ? 'Тёмная' : 'Светлая',
+                        style: TextStyle(
+                          color: cs.onSurface.withOpacity(0.7),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Switch(
-                  value: themeMode == ThemeMode.dark,
-                  activeColor: cs.primary,
-                  onChanged: (v) =>
-                      onThemeModeChanged(v ? ThemeMode.dark : ThemeMode.light),
+                  value: isDarkMode,
+                  onChanged: (_) => onToggleTheme(),
                 ),
               ],
             ),
@@ -969,40 +1117,27 @@ class ProfileScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: cs.outlineVariant),
+              color: cs.primaryContainer.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Информация',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Это демо версия CRM системы. Все данные хранятся локально и сбрасываются при обновлении страницы.',
-                  style: TextStyle(fontSize: 13),
-                ),
-              ],
+            child: const Text(
+              'Это демо-версия CRM системы. Данные могут быть тестовыми и '
+              'очищаться при обновлении или переустановке приложения.',
             ),
-            ),
-          const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: cs.error,
-                side: BorderSide(color: cs.error),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+              icon: Icon(
+                Icons.logout,
+                color: cs.error,
+              ),
+              label: Text(
+                'Выйти из аккаунта',
+                style: TextStyle(color: cs.error),
               ),
               onPressed: onLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Выйти из аккаунта'),
             ),
           ),
         ],
@@ -1010,6 +1145,52 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
+
+class _ProfileInfoRow extends StatelessWidget {
+  const _ProfileInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: cs.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ----------------- TABLE DETAILS SCREEN -----------------
 
 class TableDetailsScreen extends StatefulWidget {
   const TableDetailsScreen({
@@ -1028,8 +1209,6 @@ class TableDetailsScreen extends StatefulWidget {
 class _TableDetailsScreenState extends State<TableDetailsScreen> {
   late Future<List<ApiOrder>> _ordersFuture;
   late Future<MenuResponse> _menuFuture;
-
-  // menuItemId -> quantity
   final Map<String, int> _selectedQty = {};
   bool _submitting = false;
   String? _error;
@@ -1049,23 +1228,18 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
     setState(_reloadAll);
   }
 
-  void _changeQty(String itemId, int delta) {
-    setState(() {
-      final current = _selectedQty[itemId] ?? 0;
-      final next = current + delta;
-      if (next <= 0) {
-        _selectedQty.remove(itemId);
-      } else {
-        _selectedQty[itemId] = next;
+  Future<void> _submitOrder() async {
+    final items = <CreateOrderItem>[];
+    _selectedQty.forEach((id, qty) {
+      if (qty > 0) {
+        items.add(CreateOrderItem(menuItemId: id, quantity: qty));
       }
     });
-  }
 
-  Future<void> _submitOrder(List<MenuItem> allMenuItems) async {
-    if (_selectedQty.values.where((q) => q > 0).isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Добавьте хотя бы одну позицию')),
-      );
+    if (items.isEmpty) {
+      setState(() {
+        _error = 'Добавьте блюда в заказ';
+      });
       return;
     }
 
@@ -1075,13 +1249,6 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
     });
 
     try {
-      final items = <CreateOrderItem>[];
-      _selectedQty.forEach((id, qty) {
-        if (qty > 0) {
-          items.add(CreateOrderItem(menuItemId: id, quantity: qty));
-        }
-      });
-
       final payload = CreateOrderPayload(
         customerName: 'Стол ${widget.tableNumber}',
         table: widget.tableNumber,
@@ -1089,17 +1256,16 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
       );
 
       final res = await widget.apiClient.createOrder(payload);
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Заказ создан • ${res.order.total.toStringAsFixed(0)} ₽'),
-        ),
+        SnackBar(content: Text('Заказ ${res.order.id} создан')),
       );
 
       setState(() {
         _selectedQty.clear();
-        _reloadAll();
       });
+      await _refresh();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
@@ -1124,257 +1290,181 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            // Блок текущих заказов
             Text(
               'Текущие заказы',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             FutureBuilder<List<ApiOrder>>(
               future: _ordersFuture,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
+                    padding: EdgeInsets.all(16),
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                if (snap.hasError) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Ошибка загрузки заказов',
-                      style: TextStyle(color: cs.error),
-                    ),
+                if (snapshot.hasError) {
+                  return Text(
+                    'Ошибка загрузки заказов',
+                    style: TextStyle(color: cs.error),
                   );
                 }
-
-                final allOrders = snap.data ?? [];
-                final tableOrders = allOrders
-                    .where((o) => (o.tableNumber ?? '') == widget.tableNumber)
-                    .toList()
-                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-                if (tableOrders.isEmpty) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Text(
-                      'Пока нет заказов для этого стола',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  );
+                final orders = snapshot.data
+                        ?.where((o) =>
+                            (o.tableNumber ?? '') == widget.tableNumber)
+                        .toList() ??
+                    [];
+                if (orders.isEmpty) {
+                  return const Text('Для этого стола ещё нет заказов');
                 }
-
                 return Column(
-                  children: [
-                    for (final o in tableOrders)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    o.customerName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Статус: ${o.status}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF9CA3AF),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Создан: ${o.createdAt.toLocal()}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF6B7280),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${o.total.toStringAsFixed(0)} ₽',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ],
-                        ),
+                  children: orders.map((o) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                  ],
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              o.customerName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${o.total.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 );
               },
             ),
-
-            const SizedBox(height: 16),
-            Divider(color: cs.onSurface.withOpacity(0.1)),
-            const SizedBox(height: 16),
-
-            // Блок создания заказа
+            const SizedBox(height: 24),
             Text(
               'Новый заказ',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: cs.error, fontSize: 13),
-                ),
-              ),
             FutureBuilder<MenuResponse>(
               future: _menuFuture,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
+                    padding: EdgeInsets.all(16),
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                if (snap.hasError || snap.data == null) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Не удалось загрузить меню',
-                      style: TextStyle(color: cs.error),
-                    ),
+                if (snapshot.hasError) {
+                  return Text(
+                    'Ошибка загрузки меню',
+                    style: TextStyle(color: cs.error),
                   );
                 }
+                final menu = snapshot.data;
+                if (menu == null || menu.items.isEmpty) {
+                  return const Text('Меню пусто');
+                }
 
-                final menu = snap.data!;
-                final activeItems = menu.items
+                final items = menu.items
                     .where((i) => i.isActive && i.status != 'hidden')
                     .toList();
 
-                if (activeItems.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'Нет доступных позиций в меню',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-                    ),
-                  );
-                }
-
                 return Column(
-                  children: [
-                    Container(
+                  children: items.map((item) {
+                    final qty = _selectedQty[item.id] ?? 0;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: cs.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: activeItems.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(color: cs.onSurface.withOpacity(0.05)),
-                        itemBuilder: (context, index) {
-                          final item = activeItems[index];
-                          final qty = _selectedQty[item.id] ?? 0;
-
-                          return ListTile(
-                            title: Text(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
                               item.name,
-                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            subtitle: Text(
-                              '${item.price.toStringAsFixed(0)} ₽',
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                  onPressed: qty > 0
-                                      ? () => _changeQty(item.id, -1)
-                                      : null,
-                                ),
-                                Text(
-                                  '$qty',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.add_circle_outline),
-                                  onPressed: () => _changeQty(item.id, 1),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _submitting
-                            ? null
-                            : () => _submitOrder(activeItems),
-                        style: FilledButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ),
-                        child: _submitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text(
-                                'Отправить заказ',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${item.price.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: qty > 0
+                                ? () {
+                                    setState(() {
+                                      final current =
+                                          _selectedQty[item.id] ?? 0;
+                                      if (current > 1) {
+                                        _selectedQty[item.id] = current - 1;
+                                      } else {
+                                        _selectedQty.remove(item.id);
+                                      }
+                                    });
+                                  }
+                                : null,
+                          ),
+                          Text('$qty'),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: () {
+                              setState(() {
+                                _selectedQty[item.id] = qty + 1;
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 );
               },
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(color: cs.error),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _submitting ? null : _submitOrder,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Создать заказ'),
+              ),
             ),
           ],
         ),

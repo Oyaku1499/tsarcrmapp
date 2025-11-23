@@ -90,41 +90,6 @@ class ApiClient {
     return AuthUser.fromJson(data);
   }
 
-// ---------- TABLES ----------
-
-  Future<List<ApiTable>> getTables() async {
-    final uri = _buildUri('/tables');
-    final res = await http.get(uri, headers: _headers());
-    final data = await _handleResponse(res);
-    final list = data['tables'] as List<dynamic>? ?? const [];
-    return list
-        .map((e) => ApiTable.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<ApiTable> createTable({
-    required String number,
-    required String zone,
-    int seats = 2,
-    String status = 'free',
-  }) async {
-    final uri = _buildUri('/tables');
-    final res = await http.post(
-      uri,
-      headers: _headers(),
-      body: json.encode({
-        'number': number,
-        'zone': zone,
-        'seats': seats,
-        'status': status,
-      }),
-    );
-    final data = await _handleResponse(res);
-    final tableJson =
-        data['table'] as Map<String, dynamic>? ?? data; // на всякий случай
-    return ApiTable.fromJson(tableJson);
-  }
-
   // ---------- MENU ----------
 
   Future<MenuResponse> getMenu() async {
@@ -154,34 +119,15 @@ class ApiClient {
     final data = await _handleResponse(res);
     return OrderResponse.fromJson(data);
   }
-}
-
-// ---------- TABLES ----------
-
-class ApiTable {
-  final String id;
-  final String number;
-  final String? zone;
-  final int seats;
-  final String status;
-
-  ApiTable({
-    required this.id,
-    required this.number,
-    this.zone,
-    required this.seats,
-    required this.status,
-  });
-
-  factory ApiTable.fromJson(Map<String, dynamic> json) {
-    return ApiTable(
-      id: json['id'] as String,
-      number: json['number']?.toString() ?? '',
-      zone: json['zone'] as String?,
-      seats: (json['seats'] as num?)?.toInt() ?? 0,
-      status: json['status'] as String? ?? 'free',
+  Future<void> deleteOrder(String id) async {
+    final uri = _buildUri('/orders/$id');
+    final res = await http.delete(
+      uri,
+      headers: _headers(),
     );
+    await _handleResponse(res);
   }
+
 }
 
 class ApiException implements Exception {
@@ -191,7 +137,8 @@ class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
 
   @override
-  String toString() => 'ApiException(${statusCode ?? '-'}): $message';
+  String toString() =>
+      'ApiException(${statusCode ?? '-'}): $message';
 }
 
 // ---------- MODELS -----------
@@ -322,18 +269,36 @@ class ApiOrder {
     this.notes,
   });
 
+  
   factory ApiOrder.fromJson(Map<String, dynamic> json) {
+    String? tableNumber;
+    final tn = json['tableNumber'];
+    if (tn != null) {
+      tableNumber = tn.toString();
+    } else {
+      final table = json['table'];
+      if (table is Map<String, dynamic>) {
+        final numVal = table['number'] ?? table['tableNumber'];
+        if (numVal != null) {
+          tableNumber = numVal.toString();
+        }
+      } else if (table != null) {
+        tableNumber = table.toString();
+      }
+    }
+
     return ApiOrder(
       id: json['id'] as String,
       customerName: json['customerName'] as String,
       customerPhone: json['customerPhone'] as String?,
-      tableNumber: json['tableNumber'] as String?,
+      tableNumber: tableNumber,
       notes: json['notes'] as String?,
       status: json['status'] as String,
       total: (json['total'] as num?)?.toDouble() ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
+
 }
 
 class CreateOrderPayload {
@@ -375,6 +340,147 @@ class CreateOrderItem {
         'quantity': quantity,
       };
 }
+
+
+// ---------- TABLES ----------
+
+
+class TableReservation {
+  final DateTime? dateTime;
+  final String? rawDateTime;
+  final String? name;
+  final String? contacts;
+  final int? guests;
+  final String? preOrder;
+
+  TableReservation({
+    this.dateTime,
+    this.rawDateTime,
+    this.name,
+    this.contacts,
+    this.guests,
+    this.preOrder,
+  });
+
+  factory TableReservation.fromJson(Map<String, dynamic> json) {
+    DateTime? parsedDate;
+    String? raw;
+    final dtValue = json['dateTime'] ??
+        json['datetime'] ??
+        json['date'] ??
+        json['reservedAt'];
+    if (dtValue is String) {
+      raw = dtValue;
+      try {
+        parsedDate = DateTime.parse(dtValue);
+      } catch (_) {
+        // ignore parse errors, keep raw string
+      }
+    } else if (dtValue != null) {
+      raw = dtValue.toString();
+    }
+
+    int? guests;
+    final gVal = json['guests'] ?? json['persons'] ?? json['people'];
+    if (gVal is num) {
+      guests = gVal.toInt();
+    } else if (gVal is String) {
+      guests = int.tryParse(gVal);
+    }
+
+    return TableReservation(
+      dateTime: parsedDate,
+      rawDateTime: raw,
+      name: json['name'] as String? ?? json['customerName'] as String?,
+      contacts: json['contacts'] as String? ??
+          json['phone'] as String? ??
+          json['phoneNumber'] as String?,
+      guests: guests,
+      preOrder: json['preorder'] as String? ??
+          json['preOrder'] as String? ??
+          json['pre_order'] as String? ??
+          json['order'] as String?,
+    );
+  }
+
+  String get dateTimeDisplay {
+    if (dateTime != null) {
+      return dateTime.toString();
+    }
+    return rawDateTime ?? 'Не указано';
+  }
+}
+
+class ApiTable {
+  final String id;
+  final String number;
+  final String? zone;
+  final int seats;
+  final String status;
+  final TableReservation? reservation;
+
+  ApiTable({
+    required this.id,
+    required this.number,
+    this.zone,
+    required this.seats,
+    required this.status,
+    this.reservation,
+  });
+
+  factory ApiTable.fromJson(Map<String, dynamic> json) {
+    TableReservation? reservation;
+    final resJson = json['reservation'];
+    if (resJson is Map<String, dynamic>) {
+      reservation = TableReservation.fromJson(resJson);
+    }
+    return ApiTable(
+      id: json['id'] as String,
+      number: json['number']?.toString() ?? '',
+      zone: json['zone'] as String?,
+      seats: (json['seats'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'free',
+      reservation: reservation,
+    );
+  }
+}
+
+
+extension TablesApi on ApiClient {
+  Future<List<ApiTable>> getTables() async {
+    final uri = _buildUri('/tables');
+    final res = await http.get(uri, headers: _headers());
+    final data = await _handleResponse(res);
+    final list = data['tables'] as List<dynamic>? ?? const [];
+    return list
+        .map((e) => ApiTable.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ApiTable> createTable({
+    required String number,
+    required String zone,
+    int seats = 2,
+    String status = 'free',
+  }) async {
+    final uri = _buildUri('/tables');
+    final res = await http.post(
+      uri,
+      headers: _headers(),
+      body: json.encode({
+        'number': number,
+        'zone': zone,
+        'seats': seats,
+        'status': status,
+      }),
+    );
+    final data = await _handleResponse(res);
+    final tableJson =
+        data['table'] as Map<String, dynamic>? ?? data;
+    return ApiTable.fromJson(tableJson);
+  }
+}
+
 
 class OrderResponse {
   final ApiOrder order;
