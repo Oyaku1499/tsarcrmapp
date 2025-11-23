@@ -573,13 +573,11 @@ class _TableCard extends StatelessWidget {
   final VoidCallback? onChanged;
 
   String get _statusLabel {
-    // Если есть бронь или статус стола — reserved
-    if (reservation != null || tableStatus == 'reserved') {
+     if (reservation != null || tableStatus == 'reserved') {
       return 'Забронирован';
     }
 
-    // Занят: учитываем и busy, и occupied (как приходит из CRM)
-    if (tableStatus == 'busy' || tableStatus == 'occupied') {
+    if (tableStatus == 'busy') {
       return 'Занят';
     }
 
@@ -587,17 +585,13 @@ class _TableCard extends StatelessWidget {
     final hasPreparing = orders.any((o) => o.status == 'preparing');
     final hasWaiting =
         orders.any((o) => o.status == 'completed'); // условно "ждёт счёт"
-
-    // Нет заказов или "без стола"
     if (orders.isEmpty || tableNumber == '—') {
       return switch (tableStatus) {
-        'busy' || 'occupied' => 'Занят',
+        'busy' => 'Занят',
         'free' => 'Свободен',
-        'reserved' => 'Забронирован',
         _ => 'Свободен',
       };
     }
-
     if (hasWaiting) return 'Ожидает счёт';
     if (hasPreparing) return 'Готовится';
     if (hasNew) return 'Новый заказ';
@@ -606,23 +600,16 @@ class _TableCard extends StatelessWidget {
 
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    // Зарезервирован (бронь)
     if (reservation != null || tableStatus == 'reserved') {
       return cs.secondary;
     }
-
-    // Занят — busy или occupied
-    if (tableStatus == 'busy' || tableStatus == 'occupied') {
+    if (tableStatus == 'busy') {
       return cs.error;
     }
 
-    // Есть завершённый заказ — условно "ждёт счёт"
     if (orders.any((o) => o.status == 'completed')) {
       return cs.tertiary;
     }
-
-    // Остальные варианты — свободен / новый заказ / готовится
     return cs.primary;
   }
 

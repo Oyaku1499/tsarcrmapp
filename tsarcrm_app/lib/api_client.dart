@@ -445,7 +445,7 @@ class ApiTable {
     }
 
     return ApiTable(
-      id: json['id'] as String,
+      id: (json['id'] ?? json['_id']).toString(),
       number: json['number']?.toString() ?? '',
       zone: json['zone'] as String?,
       seats: (json['seats'] as num?)?.toInt() ?? 0,
