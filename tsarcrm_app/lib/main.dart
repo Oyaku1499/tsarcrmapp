@@ -534,6 +534,7 @@ class _TablesScreenState extends State<TablesScreen> {
                     tableNumber: table.number,
                     orders: orders,
                     tableStatus: table.status,
+                    reservation: table.reservation,
                     onChanged: _reload,
                   );
                 },
@@ -561,32 +562,42 @@ class _TableCard extends StatelessWidget {
     required this.tableNumber,
     required this.orders,
     required this.tableStatus,
+    this.reservation,
     this.onChanged,
   });
 
   final String tableNumber;
   final List<ApiOrder> orders;
   final String tableStatus;
+    final TableReservation? reservation;
   final VoidCallback? onChanged;
 
   String get _statusLabel {
-    if (orders.isEmpty || tableNumber == '—') {
-      // если заказов нет — используем статус стола из CRM
-      switch (tableStatus) {
-        case 'reserved':
-          return 'Забронирован';
-        case 'busy':
-          return 'Занят';
-        case 'free':
-        default:
-          return 'Свободен';
-      }
+    // Если есть бронь или статус стола — reserved
+    if (reservation != null || tableStatus == 'reserved') {
+      return 'Забронирован';
+    }
+
+    // Занят: учитываем и busy, и occupied (как приходит из CRM)
+    if (tableStatus == 'busy' || tableStatus == 'occupied') {
+      return 'Занят';
     }
 
     final hasNew = orders.any((o) => o.status == 'new');
     final hasPreparing = orders.any((o) => o.status == 'preparing');
     final hasWaiting =
         orders.any((o) => o.status == 'completed'); // условно "ждёт счёт"
+
+    // Нет заказов или "без стола"
+    if (orders.isEmpty || tableNumber == '—') {
+      return switch (tableStatus) {
+        'busy' || 'occupied' => 'Занят',
+        'free' => 'Свободен',
+        'reserved' => 'Забронирован',
+        _ => 'Свободен',
+      };
+    }
+
     if (hasWaiting) return 'Ожидает счёт';
     if (hasPreparing) return 'Готовится';
     if (hasNew) return 'Новый заказ';
@@ -595,21 +606,23 @@ class _TableCard extends StatelessWidget {
 
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (orders.isEmpty || tableNumber == '—') {
-      switch (tableStatus) {
-        case 'reserved':
-          return const Color(0xFFFACC15); // жёлтый
-        case 'busy':
-          return const Color(0xFFEF4444); // красный
-        case 'free':
-        default:
-          return const Color(0xFF16A34A); // зелёный
-      }
+
+    // Зарезервирован (бронь)
+    if (reservation != null || tableStatus == 'reserved') {
+      return cs.secondary;
     }
 
-    if (orders.any((o) => o.status == 'completed')) {
-      return const Color(0xFFF97316);
+    // Занят — busy или occupied
+    if (tableStatus == 'busy' || tableStatus == 'occupied') {
+      return cs.error;
     }
+
+    // Есть завершённый заказ — условно "ждёт счёт"
+    if (orders.any((o) => o.status == 'completed')) {
+      return cs.tertiary;
+    }
+
+    // Остальные варианты — свободен / новый заказ / готовится
     return cs.primary;
   }
 
@@ -660,10 +673,10 @@ class _TableCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF020617),
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: _statusColor(context).withOpacity(0.6),
+            color: cs.outlineVariant.withOpacity(0.6),
             width: 1.1,
           ),
         ),
@@ -686,7 +699,7 @@ class _TableCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _statusColor(context).withOpacity(0.18),
+                    color: _statusColor(context).withOpacity(0.16),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -699,7 +712,30 @@ class _TableCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            if (reservation != null) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.event_available_outlined,
+                    size: 16,
+                    color: cs.secondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Бронь: ${reservation!.dateTimeDisplay}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             // краткая инфа по гостям / заказам
             Row(
               children: [
@@ -724,8 +760,11 @@ class _TableCard extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: cs.surfaceVariant.withOpacity(0.15),
+                  color: cs.surfaceVariant.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: cs.outlineVariant.withOpacity(0.4),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1018,7 +1057,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           height: 72,
                           margin: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: cs.surfaceVariant,
+                            color: cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.image_outlined),
@@ -1099,21 +1138,24 @@ class _MenuCategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF020617),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF1E293B),
+          color: cs.outlineVariant.withOpacity(0.6),
           width: 1,
         ),
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(
+        data: theme.copyWith(
           dividerColor: Colors.transparent,
+          splashColor: cs.primary.withOpacity(0.05),
+          highlightColor: cs.primary.withOpacity(0.03),
         ),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1402,6 +1444,7 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
 
   
   Widget _buildReservationRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -1411,9 +1454,9 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
             width: 140,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF9CA3AF),
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -1421,8 +1464,9 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
+                color: cs.onSurface,
               ),
             ),
           ),
@@ -1451,6 +1495,25 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                 final reservation = table?.reservation;
                 final isReserved =
                     (table?.status == 'reserved') || reservation != null;
+                
+                if (tsnap.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: cs.outlineVariant),
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        height: 28,
+                        width: 28,
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                  );
+                }
 
                 if (!isReserved) {
                   return const SizedBox.shrink();
@@ -1460,9 +1523,9 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF020617),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: cs.outlineVariant),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1501,11 +1564,11 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                               : 'Нет',
                         ),
                       ] else
-                        const Text(
+                        Text(
                           'Информация о брони недоступна',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF9CA3AF),
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                     ],
@@ -1550,15 +1613,15 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF020617),
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      border: Border.all(color: cs.outlineVariant),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Пока нет заказов для этого стола',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF9CA3AF),
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   );
@@ -1571,9 +1634,9 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF020617),
+                          color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: cs.outlineVariant),
                         ),
                         child: Row(
                           children: [
@@ -1591,17 +1654,17 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     'Статус: ${o.status}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF9CA3AF),
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     'Создан: ${o.createdAt.toLocal()}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF6B7280),
+                                      color: cs.outline,
                                     ),
                                   ),
                                 ],
@@ -1678,7 +1741,6 @@ class _MenuSelection {
 
 class _CreateOrderDialog extends StatefulWidget {
   const _CreateOrderDialog({
-    super.key,
     required this.apiClient,
     required this.tableNumber,
   });
@@ -1980,7 +2042,7 @@ class _CreateOrderDialogState extends State<_CreateOrderDialog> {
 }
 
 class _MenuPickerDialog extends StatefulWidget {
-  const _MenuPickerDialog({super.key, required this.apiClient});
+  const _MenuPickerDialog({required this.apiClient});
 
   final ApiClient apiClient;
 

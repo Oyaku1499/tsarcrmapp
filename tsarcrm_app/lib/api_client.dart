@@ -428,12 +428,22 @@ class ApiTable {
     this.reservation,
   });
 
-  factory ApiTable.fromJson(Map<String, dynamic> json) {
+  ApiTable.fromJson(Map<String, dynamic> json) {
     TableReservation? reservation;
-    final resJson = json['reservation'];
+
+    // 1. Пытаемся взять reservation с верхнего уровня
+    dynamic resJson = json['reservation'];
+
+    // 2. Если нет — пробуем достать из data.reservation (как в веб-CRM)
+    final data = json['data'];
+    if (resJson == null && data is Map<String, dynamic>) {
+      resJson = data['reservation'];
+    }
+
     if (resJson is Map<String, dynamic>) {
       reservation = TableReservation.fromJson(resJson);
     }
+
     return ApiTable(
       id: json['id'] as String,
       number: json['number']?.toString() ?? '',
