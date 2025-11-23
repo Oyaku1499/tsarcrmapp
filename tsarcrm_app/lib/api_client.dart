@@ -194,6 +194,7 @@ class MenuResponse {
 class MenuItem {
   final String id;
   final String name;
+  final String description;
   final String category;
   final String categoryId;
   final double price;
@@ -204,6 +205,7 @@ class MenuItem {
   MenuItem({
     required this.id,
     required this.name,
+    required this.description,
     required this.category,
     required this.categoryId,
     required this.price,
@@ -216,6 +218,7 @@ class MenuItem {
     return MenuItem(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String? ?? '',
       category: json['category'] as String? ?? '',
       categoryId: json['categoryId'] as String? ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0,

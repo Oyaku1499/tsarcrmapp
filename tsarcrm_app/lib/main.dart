@@ -724,7 +724,7 @@ class _TableCard extends StatelessWidget {
     ApiOrder? lastOrder;
     if (orders.isNotEmpty) {
       final sorted = [...orders]
-        sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       lastOrder = sorted.first;
     }
 
