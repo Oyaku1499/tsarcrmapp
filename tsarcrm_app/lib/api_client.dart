@@ -428,7 +428,7 @@ class ApiTable {
     this.reservation,
   });
 
-  ApiTable.fromJson(Map<String, dynamic> json) {
+  factory ApiTable.fromJson(Map<String, dynamic> json) {
     TableReservation? reservation;
 
     // 1. Пытаемся взять reservation с верхнего уровня
