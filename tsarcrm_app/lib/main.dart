@@ -1,11 +1,6 @@
+
 import 'package:flutter/material.dart';
 import 'api_client.dart';
-
-ApiClient apiClientFromContext(BuildContext context) {
-  // самый простой способ — пробросить через InheritedWidget или заменить на глобалку
-  // Для простоты сейчас используем глобальный singleton:
-  return globalApiClient;
-}
 
 final globalApiClient = ApiClient();
 
@@ -13,6 +8,7 @@ void main() {
   runApp(WaiterApp(apiClient: globalApiClient));
 }
 
+/// Корневой виджет приложения.
 class WaiterApp extends StatefulWidget {
   const WaiterApp({super.key, required this.apiClient});
 
@@ -26,93 +22,41 @@ class _WaiterAppState extends State<WaiterApp> {
   AuthUser? _user;
   bool _isDarkMode = true;
 
-  static const _accent = Color(0xFFFF8C3A);
-  static const _darkBg = Color(0xFF0B1D36);
-  static const _darkSurface = Color(0xFF102544);
-  static const _darkCard = Color(0xFF132B4C);
-  static const _lightBg = Color(0xFFF6F7FB);
-
   @override
   Widget build(BuildContext context) {
-    final theme = _isDarkMode
+    const seed = Color(0xFFFF8A00); // тёплый оранжевый как в web-прототипе
+
+    final ThemeData theme = _isDarkMode
         ? ThemeData(
             useMaterial3: true,
             brightness: Brightness.dark,
-            scaffoldBackgroundColor: _darkBg,
-            colorScheme: const ColorScheme(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: seed,
               brightness: Brightness.dark,
-              primary: _accent,
-              onPrimary: Colors.white,
-              secondary: Color(0xFF4FA3FF),
-              onSecondary: Colors.white,
-              tertiary: Color(0xFF7DD56F),
-              onTertiary: Colors.black,
-              error: Color(0xFFFF5F52),
-              onError: Colors.white,
-              background: _darkBg,
-              onBackground: Colors.white,
-              surface: _darkSurface,
-              onSurface: Colors.white,
-              surfaceVariant: Color(0xFF183357),
-              onSurfaceVariant: Color(0xFFC1D4EF),
-              outline: Color(0xFF6B7B97),
-              outlineVariant: Color(0xFF1F3E66),
-              shadow: Colors.black,
-              scrim: Colors.black54,
-              inverseSurface: _lightBg,
-              onInverseSurface: Colors.black,
-              inversePrimary: _accent,
-              surfaceTint: _accent,
             ),
-            cardColor: _darkCard,
+            scaffoldBackgroundColor: const Color(0xFF050816),
             appBarTheme: const AppBarTheme(
-              backgroundColor: _darkBg,
+              backgroundColor: Color(0xFF050816),
               elevation: 0,
-              foregroundColor: Colors.white,
-              centerTitle: true,
             ),
           )
         : ThemeData(
             useMaterial3: true,
             brightness: Brightness.light,
-            scaffoldBackgroundColor: _lightBg,
-            colorScheme: const ColorScheme(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: seed,
               brightness: Brightness.light,
-              primary: _accent,
-              onPrimary: Colors.white,
-              secondary: Color(0xFF3876F6),
-              onSecondary: Colors.white,
-              tertiary: Color(0xFF20B072),
-              onTertiary: Colors.white,
-              error: Color(0xFFDA1E28),
-              onError: Colors.white,
-              background: _lightBg,
-              onBackground: Color(0xFF0B1D36),
-              surface: Colors.white,
-              onSurface: Color(0xFF0B1D36),
-              surfaceVariant: Color(0xFFF1F3F8),
-              onSurfaceVariant: Color(0xFF5C6B80),
-              outline: Color(0xFFDADDE5),
-              outlineVariant: Color(0xFFE7E9F0),
-              shadow: Colors.black26,
-              scrim: Colors.black54,
-              inverseSurface: _darkBg,
-              onInverseSurface: Colors.white,
-              inversePrimary: _accent,
-              surfaceTint: _accent,
             ),
-            cardColor: Colors.white,
+            scaffoldBackgroundColor: const Color(0xFFF5F5F7),
             appBarTheme: const AppBarTheme(
               backgroundColor: Colors.white,
               elevation: 0,
-              foregroundColor: Color(0xFF0B1D36),
-              centerTitle: true,
             ),
           );
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Tsar Waiter',
+      title: 'Restaurant CRM',
       theme: theme,
       home: _user == null
           ? LoginScreen(
@@ -123,7 +67,8 @@ class _WaiterAppState extends State<WaiterApp> {
               apiClient: widget.apiClient,
               user: _user!,
               isDarkMode: _isDarkMode,
-              onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
+              onToggleTheme: () =>
+                  setState(() => _isDarkMode = !_isDarkMode),
               onLogout: () => setState(() => _user = null),
             ),
     );
@@ -162,20 +107,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final user = await widget.apiClient.login(
-        username: _loginCtrl.text.trim(),
-        password: _passCtrl.text,
-      );
+      final user = await widget.apiClient
+          .login(username: _loginCtrl.text.trim(), password: _passCtrl.text);
+      if (!mounted) return;
       widget.onLoggedIn(user);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
-    } catch (e) {
+    } catch (_) {
       setState(() => _error = 'Не удалось выполнить вход');
     } finally {
       if (mounted) {
@@ -192,42 +137,40 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                const SizedBox(height: 32),
                 Container(
-                  width: 90,
-                  height: 90,
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.12),
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        cs.primary.withOpacity(0.15),
-                        cs.secondary.withOpacity(0.4),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                   ),
-                  child: const Icon(Icons.restaurant, size: 40),
+                  child: Icon(
+                    Icons.restaurant_menu,
+                    size: 44,
+                    color: cs.primary,
+                  ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Вход в CRM',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 6),
-                const Text(
+                const SizedBox(height: 8),
+                Text(
                   'Авторизуйтесь, чтобы работать со столами и заказами',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF9CA3AF),
-                  ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: cs.onSurface.withOpacity(0.7)),
                 ),
                 const SizedBox(height: 32),
                 Form(
@@ -240,10 +183,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'Логин',
                           prefixIcon: Icon(Icons.badge_outlined),
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty)
-                                ? 'Введите логин'
-                                : null,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Введите логин'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -253,50 +195,32 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'Пароль',
                           prefixIcon: Icon(Icons.lock_outline),
                         ),
-                        validator: (v) =>
-                            (v == null || v.isEmpty)
-                                ? 'Введите пароль'
-                                : null,
-                      ),
-                      const SizedBox(height: 16),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _error!,
-                            style: TextStyle(
-                              color: cs.error,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _loading ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text(
-                                  'Войти',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Введите пароль'
+                            : null,
                       ),
                     ],
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: cs.error),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _loading ? null : _submit,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Войти'),
                   ),
                 ),
               ],
@@ -345,66 +269,43 @@ class _HomeShellState extends State<HomeShell> {
         onLogout: widget.onLogout,
       ),
     ];
-    
-    final cs = Theme.of(context).colorScheme;
+
+    final titles = ['Столы', 'Меню', 'Профиль'];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          switch (_index) {
-            0 => 'Столы',
-            1 => 'Меню',
-            2 => 'Профиль',
-            _ => '',
-          },
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          titles[_index],
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        child: screens[_index],
+      body: IndexedStack(
+        index: _index,
+        children: screens,
       ),
-      bottomNavigationBar: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          height: 74,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          backgroundColor: cs.surface,
-          indicatorColor: cs.primary.withOpacity(0.18),
-          iconTheme: MaterialStateProperty.resolveWith((states) {
-            final selected = states.contains(MaterialState.selected);
-            return IconThemeData(
-              color: selected ? cs.primary : cs.onSurfaceVariant,
-            );
-          }),
-          labelTextStyle: MaterialStateProperty.resolveWith((states) {
-            final selected = states.contains(MaterialState.selected);
-            return TextStyle(
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            );
-          }),
-        ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.table_bar_outlined),
-              selectedIcon: Icon(Icons.table_bar),
-              label: 'Столы',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.restaurant_menu_outlined),
-              selectedIcon: Icon(Icons.restaurant_menu),
-              label: 'Меню',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Профиль',
-            ),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        height: 68,
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.table_bar_outlined),
+            selectedIcon: Icon(Icons.table_bar),
+            label: 'Столы',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.restaurant_menu_outlined),
+            selectedIcon: Icon(Icons.restaurant_menu),
+            label: 'Меню',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Профиль',
+          ),
+        ],
       ),
     );
   }
@@ -419,6 +320,13 @@ class TablesScreen extends StatefulWidget {
 
   @override
   State<TablesScreen> createState() => _TablesScreenState();
+}
+
+class _TablesData {
+  final List<ApiTable> tables;
+  final List<ApiOrder> orders;
+
+  _TablesData(this.tables, this.orders);
 }
 
 
@@ -583,41 +491,27 @@ class _TablesScreenState extends State<TablesScreen> {
               }
 
               final tables = [...data.tables]
-                ..sort((a, b) {
-                  final an = int.tryParse(a.number);
-                  final bn = int.tryParse(b.number);
-                  if (an != null && bn != null) return an.compareTo(bn);
-                  return a.number.compareTo(b.number);
-                });
+                ..sort((a, b) => a.number.compareTo(b.number));
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth > 1100
-                      ? 4
-                      : constraints.maxWidth > 800
-                          ? 3
-                          : 2;
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: tables.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.9,
-                    ),
-                    itemBuilder: (context, index) {
-                      final table = tables[index];
-                      final orders = byTable[table.number] ?? const [];
-                      return _TableCard(
-                        tableNumber: table.number,
-                        orders: orders,
-                        seats: table.seats,
-                        tableStatus: table.status,
-                        reservation: table.reservation,
-                        onChanged: _reload,
-                      );
-                    },
+              final entries = tables
+                  .map((t) => MapEntry(t.number, byTable[t.number] ?? const []))
+                  .toList();
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: entries.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.1,
+                ),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  return _TableCard(
+                    tableNumber: entry.key,
+                    orders: entry.value,
+                    onChanged: _reload,
                   );
                 },
               );
@@ -638,74 +532,69 @@ class _TablesScreenState extends State<TablesScreen> {
   }
 }
 
-
-
 class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.tableNumber,
     required this.orders,
-    required this.seats,
-    required this.tableStatus,
-    this.reservation,
-    this.onChanged,
+    required this.onChanged,
   });
 
   final String tableNumber;
   final List<ApiOrder> orders;
-  final int seats;
-  final String tableStatus;
-  final TableReservation? reservation;
-  final VoidCallback? onChanged;
+  final VoidCallback onChanged;
 
   String get _statusLabel {
-    if (reservation != null || tableStatus == 'reserved') {
-      return 'Бронь';
-    }
-
-    if (tableStatus == 'busy') {
-      return 'Занят';
-    }
+    if (orders.isEmpty || tableNumber == '—') return 'Свободен';
 
     final hasNew = orders.any((o) => o.status == 'new');
     final hasPreparing = orders.any((o) => o.status == 'preparing');
-    final hasWaiting =
-        orders.any((o) => o.status == 'completed'); // условно "ждёт счёт"
-    if (orders.isEmpty || tableNumber == '—') {
-      return switch (tableStatus) {
-        'busy' => 'Занят',
-        'free' => 'Свободен',
-        _ => 'Свободен',
-      };
-    }
-    if (hasWaiting) return 'Ожидает счёт';
+    final hasCompleted = orders.any((o) => o.status == 'completed');
+
+    if (hasCompleted) return 'Ожидает счёт';
     if (hasPreparing) return 'Готовится';
     if (hasNew) return 'Новый заказ';
+
     return 'Заказ';
   }
 
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (reservation != null || tableStatus == 'reserved') {
-      return cs.secondary;
+    if (orders.isEmpty || tableNumber == '—') {
+      return const Color(0xFF16A34A);
     }
-    if (tableStatus == 'busy') {
-      return cs.error;
-    }
-
     if (orders.any((o) => o.status == 'completed')) {
-      return cs.tertiary;
+      return const Color(0xFFF97316);
     }
     return cs.primary;
   }
 
+  Future<void> _openCreateOrder(BuildContext context) async {
+    if (tableNumber == '—') return;
+
+    final apiClient = apiClientFromContext(context);
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CreateOrderDialog(
+        apiClient: apiClient,
+        tableNumber: tableNumber,
+      ),
+    );
+
+    if (created == true) {
+      onChanged();
+    }
+  }
+
   Future<void> _closeOrder(BuildContext context, ApiOrder order) async {
     final apiClient = apiClientFromContext(context);
+
     try {
       await apiClient.deleteOrder(order.id);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Заказ ${order.id} закрыт')),
       );
-      onChanged?.call();
+      onChanged();
     } on ApiException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
@@ -719,1185 +608,108 @@ class _TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    final orderCount = orders.length;
+    final cs = Theme.of(context).colorScheme;
 
     ApiOrder? lastOrder;
     if (orders.isNotEmpty) {
-      final sorted = [...orders]
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final sorted = [...orders]..sort(
+          (a, b) => b.createdAt.compareTo(a.createdAt),
+        );
       lastOrder = sorted.first;
     }
 
-    final statusColor = _statusColor(context);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.7)),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      cs.primary.withOpacity(0.1),
-                      cs.primary.withOpacity(0.24),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Стол',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  Text(
-                      tableNumber == '—' ? '—' : tableNumber,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _StatusChip(
-                          label: _statusLabel,
-                          color: statusColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceVariant.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.event_seat_outlined, size: 16),
-
-                              const SizedBox(width: 6),
-                              Text(
-                                reservation != null
-                                    ? 'Бронь: ${reservation!.guests ?? '-'} гостей'
-                                    : '$seats мест',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      reservation != null
-                          ? 'Бронь на ${reservation!.dateTimeDisplay}'
-                          : 'Статус: $_statusLabel',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: cs.surfaceVariant.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.receipt_long_outlined, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    orderCount == 0
-                        ? 'Заказов пока нет'
-                         : '$orderCount активных заказов',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-              ],
-            ),
-            ),
-          const SizedBox(height: 10),
-          if (lastOrder != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cs.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Заказ #${lastOrder.id}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.primary.withOpacity(0.16),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${lastOrder.total.toStringAsFixed(0)} ₽',
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Статус: ${lastOrder.status}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      onPressed: () => _closeOrder(context, lastOrder!),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Закрыть заказ'),
-                    ),
-                  ),
-                  ],
-              ),
-            ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                 ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => TableDetailsScreen(
-                      apiClient: apiClientFromContext(context),
-                      tableNumber: tableNumber,
-                    ),
-                  ),
-                  );
-              },
-              child: Text(
-                orders.isEmpty ? 'Создать заказ' : 'Открыть заказ',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.circle,
-            size: 10,
-            color: color,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ----------------- MENU SCREEN -----------------
-
-class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key, required this.apiClient});
-
-  final ApiClient apiClient;
-
-  @override
-  State<MenuScreen> createState() => _MenuScreenState();
-}
-
-class _MenuScreenState extends State<MenuScreen> {
-  late Future<MenuResponse> _future;
-  String _selectedCategoryId = 'all';
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _future = widget.apiClient.getMenu();
-  }
-
-  Future<void> _reload() async {
-    setState(() {
-      _future = widget.apiClient.getMenu();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return RefreshIndicator(
-      onRefresh: _reload,
-      child: FutureBuilder<MenuResponse>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                Center(
-                  child: Text(
-                    'Ошибка загрузки меню',
-                    style: TextStyle(color: cs.error),
-                  ),
-                ),
-              ],
-            );
-          }
-
-          final menu = snapshot.data;
-          if (menu == null) {
-            return ListView(
-              children: const [
-                SizedBox(height: 80),
-                Center(child: Text('Меню пусто')),
-              ],
-            );
-          }
-
-          final activeItems = menu.items.where((item) {
-            if (!item.isActive || item.status == 'hidden') return false;
-            return true;
-          }).toList();
-
-          List<MenuItem> filtered = activeItems.where((item) {
-            final matchesCategory =
-                _selectedCategoryId == 'all' ||
-                item.categoryId == _selectedCategoryId;
-            final matchesSearch = _searchQuery.isEmpty ||
-                item.name.toLowerCase().contains(_searchQuery.toLowerCase());
-            return matchesCategory && matchesSearch;
-          }).toList();
-
-          filtered.sort((a, b) => a.name.compareTo(b.name));
-
-          final selectedCategoryName = _selectedCategoryId == 'all'
-              ? 'Категории'
-              : (menu.categories
-                      .firstWhere(
-                        (c) => c.id == _selectedCategoryId,
-                        orElse: () => MenuCategory(
-                          id: '',
-                          name: 'Категория',
-                          description: '',
-                        ),
-                      )
-                      .name);
-          final categories = [
-            MenuCategory(id: 'all', name: 'Все блюда', description: ''),
-            ...menu.categories,
-          ];
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Меню',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.menu_book_outlined,
-                            size: 18, color: cs.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${filtered.length} блюд',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: cs.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: 'Поиск блюда…',
-                  filled: true,
-                  fillColor: cs.surfaceVariant,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (v) => setState(() => _searchQuery = v),
-              ),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final category in categories) ...[
-                      ChoiceChip(
-                        label: Text(category.name),
-                        selected: _selectedCategoryId == category.id,
-                        onSelected: (_) =>
-                            setState(() => _selectedCategoryId = category.id),
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _selectedCategoryId == category.id
-                              ? cs.onPrimary
-                              : cs.onSurfaceVariant,
-                        ),
-                        selectedColor: cs.primary,
-                        backgroundColor: cs.surfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (filtered.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 48),
-                  child: Center(
-                    child: Text(
-                      'Блюда не найдены',
-                      style: TextStyle(
-                        color: cs.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ),
-                )
-              else
-                ...filtered.map((item) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cs.outlineVariant),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.shadow.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          margin: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceVariant,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.image_outlined,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(
-                                right: 12, top: 12, bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  item.description.isNotEmpty
-                                      ? item.description
-                                      : 'Описание блюда появится позднее',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: cs.primary.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
-                                      ),
-                                      child: Text(
-                                        item.category.isNotEmpty
-                                            ? item.category
-                                            : 'Категория',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: cs.primary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'В наличии: ${item.stockQuantity}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              '${item.price.toStringAsFixed(0)} ₽',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: cs.onPrimary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MenuCategoryCard extends StatelessWidget {
-  const _MenuCategoryCard({
-    required this.title,
-    required this.items,
-  });
-
-  final String title;
-  final List<MenuItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cs.outlineVariant.withOpacity(0.6),
-          width: 1,
+    return GestureDetector(
+      onTap: () => _openCreateOrder(context),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF020617),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF1E293B)),
         ),
-      ),
-      child: Theme(
-        data: theme.copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: cs.primary.withOpacity(0.05),
-          highlightColor: cs.primary.withOpacity(0.03),
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          childrenPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          iconColor: cs.onSurfaceVariant,
-          collapsedIconColor: cs.onSurfaceVariant,
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-            ),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final item in items)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  item.name,
-                  style: const TextStyle(fontSize: 14),
-                ),
-                subtitle: Text(
-                  '${item.price.toStringAsFixed(0)} ₽',
-                  style: TextStyle(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                trailing: FilledButton.tonal(
-                  onPressed: () {
-                    // TODO: добавить в текущий заказ
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Добавлено: ${item.name}')),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'В заказ',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ----------------- PROFILE SCREEN -----------------
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({
-    super.key,
-    required this.user,
-    required this.isDarkMode,
-    required this.onToggleTheme,
-    required this.onLogout,
-  });
-
-  final AuthUser user;
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Профиль',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: cs.primary.withOpacity(0.15),
-                  child: Icon(
-                    Icons.person,
-                    size: 32,
-                    color: cs.primary,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Text(
-                  user.fullName.isNotEmpty ? user.fullName : user.username,
+                  tableNumber == '—' ? 'Без стола' : 'Стол $tableNumber',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 18,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  user.roleName.isNotEmpty ? user.roleName : user.role,
-                  style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                _ProfileInfoRow(
-                  icon: Icons.mail_outline,
-                  label: 'Email',
-                  value: user.email ?? 'Не указан',
-                ),
-                const SizedBox(height: 8),
-                _ProfileInfoRow(
-                  icon: Icons.badge_outlined,
-                  label: 'Логин',
-                  value: user.username,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                  color: cs.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Тема оформления',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isDarkMode ? 'Тёмная' : 'Светлая',
-                        style: TextStyle(
-                          color: cs.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: isDarkMode,
-                  onChanged: (_) => onToggleTheme(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Text(
-              'Это демо-версия CRM системы. Данные могут быть тестовыми и '
-              'очищаться при обновлении или переустановке приложения.',
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: Icon(
-                Icons.logout,
-                color: cs.error,
-              ),
-              label: Text(
-                'Выйти из аккаунта',
-                style: TextStyle(color: cs.error),
-              ),
-              onPressed: onLogout,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-  class TableDetailsScreen extends StatefulWidget {
-  const TableDetailsScreen({
-    super.key,
-    required this.apiClient,
-    required this.tableNumber,
-  });
-
-  final ApiClient apiClient;
-  final String tableNumber;
-
-  @override
-  State<TableDetailsScreen> createState() => _TableDetailsScreenState();
-}
-
-
-class _TableDetailsScreenState extends State<TableDetailsScreen> {
-  late Future<List<ApiOrder>> _ordersFuture;
-  late Future<ApiTable?> _tableFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _reload();
-  }
-
-  void _reload() {
-    _ordersFuture = widget.apiClient.getOrders();
-    _tableFuture = _loadTable();
-  }
-
-  Future<ApiTable?> _loadTable() async {
-    try {
-      final tables = await widget.apiClient.getTables();
-      return tables.firstWhere((t) => t.number == widget.tableNumber);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _refresh() async {
-    setState(_reload);
-  }
-
-  Future<void> _openCreateOrderDialog() async {
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _CreateOrderDialog(
-        apiClient: widget.apiClient,
-        tableNumber: widget.tableNumber,
-      ),
-    );
-    if (created == true) {
-      _refresh();
-    }
-  }
-
-  
-  Widget _buildReservationRow(String label, String value) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-@override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Стол ${widget.tableNumber}'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            FutureBuilder<ApiTable?>(
-              future: _tableFuture,
-              builder: (context, tsnap) {
-                final table = tsnap.data;
-                final reservation = table?.reservation;
-                final isReserved =
-                    (table?.status == 'reserved') || reservation != null;
-                
-                if (tsnap.connectionState == ConnectionState.waiting) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: const Center(
-                      child: SizedBox(
-                        height: 28,
-                        width: 28,
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
-                  );
-                }
-
-                if (!isReserved) {
-                  return const SizedBox.shrink();
-                }
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(14),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cs.outlineVariant),
+                    color: _statusColor(context).withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Бронь',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (reservation != null) ...[
-                        _buildReservationRow(
-                          'Дата и время',
-                          reservation.dateTimeDisplay,
-                        ),
-                        _buildReservationRow(
-                          'Имя',
-                          reservation.name ?? 'Не указано',
-                        ),
-                        _buildReservationRow(
-                          'Контакты',
-                          reservation.contacts ?? 'Не указано',
-                        ),
-                        _buildReservationRow(
-                          'Количество гостей',
-                          reservation.guests != null
-                              ? reservation.guests.toString()
-                              : 'Не указано',
-                        ),
-                        _buildReservationRow(
-                          'Предзаказ',
-                          (reservation.preOrder?.isNotEmpty ?? false)
-                              ? reservation.preOrder!
-                              : 'Нет',
-                        ),
-                      ] else
-                        Text(
-                          'Информация о брони недоступна',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
+                  child: Text(
+                    _statusLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: _statusColor(context),
+                    ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Текущие заказы',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            FutureBuilder<List<ApiOrder>>(
-              future: _ordersFuture,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (snap.hasError) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Ошибка загрузки заказов',
-                      style: TextStyle(color: cs.error),
-                    ),
-                  );
-                }
-                final orders = snap.data ?? const [];
-                final tableOrders = orders
-                    .where((o) => (o.tableNumber ?? '') == widget.tableNumber)
-                    .toList()
-                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-                if (tableOrders.isEmpty) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Text(
-                      'Пока нет заказов для этого стола',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-
-                return Column(
+            if (lastOrder != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final o in tableOrders)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Заказ #${o.id}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Статус: ${o.status}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: cs.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Создан: ${o.createdAt.toLocal()}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: cs.outline,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${o.total.toStringAsFixed(0)} ₽',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ],
-                        ),
+                    Text(
+                      'Заказ #${lastOrder.id}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Итого: ${lastOrder.total.toStringAsFixed(0)} ₽',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => _closeOrder(context, lastOrder!),
+                        child: const Text('Закрыть заказ'),
+                      ),
+                    ),
                   ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Создание заказа',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Откройте модальное окно, чтобы добавить позиции и блюда в заказ.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Заказов пока нет',
+                  style: TextStyle(
+                    fontSize: 12,
                     color: cs.outline,
                   ),
-            ),
-            const SizedBox(height: 12),
+                ),
+              ),
+            const Spacer(),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _openCreateOrderDialog,
-                icon: const Icon(Icons.shopping_cart_outlined),
+                onPressed:
+                    tableNumber == '—' ? null : () => _openCreateOrder(context),
+                icon: const Icon(Icons.shopping_cart_outlined, size: 18),
                 label: const Text('Создать заказ'),
               ),
             ),
@@ -1907,8 +719,6 @@ class _TableDetailsScreenState extends State<TableDetailsScreen> {
     );
   }
 }
-
-
 class _PositionItem {
   _PositionItem({required this.menuItem, this.quantity = 1});
 
@@ -1934,6 +744,7 @@ class _MenuSelection {
 
 class _CreateOrderDialog extends StatefulWidget {
   const _CreateOrderDialog({
+    super.key,
     required this.apiClient,
     required this.tableNumber,
   });
@@ -2235,7 +1046,7 @@ class _CreateOrderDialogState extends State<_CreateOrderDialog> {
 }
 
 class _MenuPickerDialog extends StatefulWidget {
-  const _MenuPickerDialog({required this.apiClient});
+  const _MenuPickerDialog({super.key, required this.apiClient});
 
   final ApiClient apiClient;
 
@@ -2541,6 +1352,520 @@ class _MenuPickerDialogState extends State<_MenuPickerDialog> {
     );
   }
 }
+ extends StatelessWidget {
+  const _TableCard({
+    required this.tableNumber,
+    required this.orders,
+  });
+
+  final String tableNumber;
+  final List<ApiOrder> orders;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasOrders = orders.isNotEmpty;
+    final color = hasOrders ? cs.primaryContainer : cs.surfaceVariant;
+
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TableDetailsScreen(
+              apiClient: globalApiClient,
+              tableNumber: tableNumber,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Стол $tableNumber',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            if (hasOrders)
+              Text(
+                'Заказов: ${orders.length}',
+                style: TextStyle(
+                  color: cs.onPrimaryContainer.withOpacity(0.9),
+                  fontSize: 12,
+                ),
+              )
+            else
+              Text(
+                'Нет активных заказов',
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ----------------- MENU SCREEN -----------------
+
+class MenuScreen extends StatefulWidget {
+  const MenuScreen({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
+
+  @override
+  State<MenuScreen> createState() => _MenuScreenState();
+}
+
+class _MenuScreenState extends State<MenuScreen> {
+  late Future<MenuResponse> _future;
+  String _selectedCategoryId = 'all';
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.apiClient.getMenu();
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _future = widget.apiClient.getMenu();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: FutureBuilder<MenuResponse>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return ListView(
+              children: [
+                const SizedBox(height: 80),
+                Center(
+                  child: Text(
+                    'Ошибка загрузки меню',
+                    style: TextStyle(color: cs.error),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          final menu = snapshot.data;
+          if (menu == null) {
+            return ListView(
+              children: const [
+                SizedBox(height: 80),
+                Center(child: Text('Меню пусто')),
+              ],
+            );
+          }
+
+          final activeItems = menu.items.where((item) {
+            if (!item.isActive || item.status == 'hidden') return false;
+            return true;
+          }).toList();
+
+          List<MenuItem> filtered = activeItems.where((item) {
+            final matchesCategory =
+                _selectedCategoryId == 'all' ||
+                item.categoryId == _selectedCategoryId;
+            final matchesSearch = _searchQuery.isEmpty ||
+                item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+          }).toList();
+
+          filtered.sort((a, b) => a.name.compareTo(b.name));
+
+          final selectedCategoryName = _selectedCategoryId == 'all'
+              ? 'Категории'
+              : (menu.categories
+                      .firstWhere(
+                        (c) => c.id == _selectedCategoryId,
+                        orElse: () => MenuCategory(
+                          id: '',
+                          name: 'Категория',
+                          description: '',
+                        ),
+                      )
+                      .name);
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              Text(
+                'Меню',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Поиск блюда…',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() => _selectedCategoryId = 'all');
+                      },
+                      child: const Text('Полное меню'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (menu.categories.isEmpty) return;
+                        final selected = await showDialog<String>(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Выберите категорию'),
+                              content: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (final c in menu.categories)
+                                      Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        width: double.infinity,
+                                        child: OutlinedButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(c.id),
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(c.name),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop('all'),
+                                  child: const Text('Сбросить'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(null),
+                                  child: const Text('Отмена'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        if (selected != null) {
+                          setState(() => _selectedCategoryId = selected);
+                        }
+                      },
+                      icon: const Icon(Icons.filter_list),
+                      label: Text(selectedCategoryName),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: Center(
+                    child: Text(
+                      'Блюда не найдены',
+                      style: TextStyle(
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...filtered.map((item) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          margin: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.image_outlined),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                                right: 12, top: 12, bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    item.category.isNotEmpty
+                                        ? item.category
+                                        : 'Категория',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'В наличии: ${item.stockQuantity}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color:
+                                        cs.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Text(
+                            '${item.price.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ----------------- PROFILE SCREEN -----------------
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({
+    super.key,
+    required this.user,
+    required this.isDarkMode,
+    required this.onToggleTheme,
+    required this.onLogout,
+  });
+
+  final AuthUser user;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Профиль',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: cs.primary.withOpacity(0.15),
+                  child: Icon(
+                    Icons.person,
+                    size: 32,
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  user.fullName.isNotEmpty ? user.fullName : user.username,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user.roleName.isNotEmpty ? user.roleName : user.role,
+                  style: TextStyle(
+                    color: cs.onSurface.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                _ProfileInfoRow(
+                  icon: Icons.mail_outline,
+                  label: 'Email',
+                  value: user.email ?? 'Не указан',
+                ),
+                const SizedBox(height: 8),
+                _ProfileInfoRow(
+                  icon: Icons.badge_outlined,
+                  label: 'Логин',
+                  value: user.username,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Тема оформления',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isDarkMode ? 'Тёмная' : 'Светлая',
+                        style: TextStyle(
+                          color: cs.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: isDarkMode,
+                  onChanged: (_) => onToggleTheme(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Text(
+              'Это демо-версия CRM системы. Данные могут быть тестовыми и '
+              'очищаться при обновлении или переустановке приложения.',
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: Icon(
+                Icons.logout,
+                color: cs.error,
+              ),
+              label: Text(
+                'Выйти из аккаунта',
+                style: TextStyle(color: cs.error),
+              ),
+              onPressed: onLogout,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _ProfileInfoRow extends StatelessWidget {
   const _ProfileInfoRow({
@@ -2582,6 +1907,289 @@ class _ProfileInfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ----------------- TABLE DETAILS SCREEN -----------------
+
+class TableDetailsScreen extends StatefulWidget {
+  const TableDetailsScreen({
+    super.key,
+    required this.apiClient,
+    required this.tableNumber,
+  });
+
+  final ApiClient apiClient;
+  final String tableNumber;
+
+  @override
+  State<TableDetailsScreen> createState() => _TableDetailsScreenState();
+}
+
+class _TableDetailsScreenState extends State<TableDetailsScreen> {
+  late Future<List<ApiOrder>> _ordersFuture;
+  late Future<MenuResponse> _menuFuture;
+  final Map<String, int> _selectedQty = {};
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadAll();
+  }
+
+  void _reloadAll() {
+    _ordersFuture = widget.apiClient.getOrders();
+    _menuFuture = widget.apiClient.getMenu();
+  }
+
+  Future<void> _refresh() async {
+    setState(_reloadAll);
+  }
+
+  Future<void> _submitOrder() async {
+    final items = <CreateOrderItem>[];
+    _selectedQty.forEach((id, qty) {
+      if (qty > 0) {
+        items.add(CreateOrderItem(menuItemId: id, quantity: qty));
+      }
+    });
+
+    if (items.isEmpty) {
+      setState(() {
+        _error = 'Добавьте блюда в заказ';
+      });
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      final payload = CreateOrderPayload(
+        customerName: 'Стол ${widget.tableNumber}',
+        table: widget.tableNumber,
+        items: items,
+      );
+
+      final res = await widget.apiClient.createOrder(payload);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Заказ ${res.order.id} создан')),
+      );
+
+      setState(() {
+        _selectedQty.clear();
+      });
+      await _refresh();
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Не удалось создать заказ');
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Стол ${widget.tableNumber}'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Text(
+              'Текущие заказы',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            FutureBuilder<List<ApiOrder>>(
+              future: _ordersFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Text(
+                    'Ошибка загрузки заказов',
+                    style: TextStyle(color: cs.error),
+                  );
+                }
+                final orders = snapshot.data
+                        ?.where((o) =>
+                            (o.tableNumber ?? '') == widget.tableNumber)
+                        .toList() ??
+                    [];
+                if (orders.isEmpty) {
+                  return const Text('Для этого стола ещё нет заказов');
+                }
+                return Column(
+                  children: orders.map((o) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              o.customerName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${o.total.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Новый заказ',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            FutureBuilder<MenuResponse>(
+              future: _menuFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Text(
+                    'Ошибка загрузки меню',
+                    style: TextStyle(color: cs.error),
+                  );
+                }
+                final menu = snapshot.data;
+                if (menu == null || menu.items.isEmpty) {
+                  return const Text('Меню пусто');
+                }
+
+                final items = menu.items
+                    .where((i) => i.isActive && i.status != 'hidden')
+                    .toList();
+
+                return Column(
+                  children: items.map((item) {
+                    final qty = _selectedQty[item.id] ?? 0;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${item.price.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: qty > 0
+                                ? () {
+                                    setState(() {
+                                      final current =
+                                          _selectedQty[item.id] ?? 0;
+                                      if (current > 1) {
+                                        _selectedQty[item.id] = current - 1;
+                                      } else {
+                                        _selectedQty.remove(item.id);
+                                      }
+                                    });
+                                  }
+                                : null,
+                          ),
+                          Text('$qty'),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: () {
+                              setState(() {
+                                _selectedQty[item.id] = qty + 1;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(color: cs.error),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _submitting ? null : _submitOrder,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Создать заказ'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

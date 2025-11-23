@@ -194,7 +194,6 @@ class MenuResponse {
 class MenuItem {
   final String id;
   final String name;
-  final String description;
   final String category;
   final String categoryId;
   final double price;
@@ -205,7 +204,6 @@ class MenuItem {
   MenuItem({
     required this.id,
     required this.name,
-    required this.description,
     required this.category,
     required this.categoryId,
     required this.price,
@@ -218,7 +216,6 @@ class MenuItem {
     return MenuItem(
       id: json['id'] as String,
       name: json['name'] as String,
-      description: json['description'] as String? ?? '',
       category: json['category'] as String? ?? '',
       categoryId: json['categoryId'] as String? ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0,
@@ -272,36 +269,18 @@ class ApiOrder {
     this.notes,
   });
 
-  
   factory ApiOrder.fromJson(Map<String, dynamic> json) {
-    String? tableNumber;
-    final tn = json['tableNumber'];
-    if (tn != null) {
-      tableNumber = tn.toString();
-    } else {
-      final table = json['table'];
-      if (table is Map<String, dynamic>) {
-        final numVal = table['number'] ?? table['tableNumber'];
-        if (numVal != null) {
-          tableNumber = numVal.toString();
-        }
-      } else if (table != null) {
-        tableNumber = table.toString();
-      }
-    }
-
     return ApiOrder(
       id: json['id'] as String,
       customerName: json['customerName'] as String,
       customerPhone: json['customerPhone'] as String?,
-      tableNumber: tableNumber,
+      tableNumber: json['tableNumber'] as String?,
       notes: json['notes'] as String?,
       status: json['status'] as String,
       total: (json['total'] as num?)?.toDouble() ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
-
 }
 
 class CreateOrderPayload {
@@ -347,80 +326,12 @@ class CreateOrderItem {
 
 // ---------- TABLES ----------
 
-
-class TableReservation {
-  final DateTime? dateTime;
-  final String? rawDateTime;
-  final String? name;
-  final String? contacts;
-  final int? guests;
-  final String? preOrder;
-
-  TableReservation({
-    this.dateTime,
-    this.rawDateTime,
-    this.name,
-    this.contacts,
-    this.guests,
-    this.preOrder,
-  });
-
-  factory TableReservation.fromJson(Map<String, dynamic> json) {
-    DateTime? parsedDate;
-    String? raw;
-    final dtValue = json['dateTime'] ??
-        json['datetime'] ??
-        json['date'] ??
-        json['reservedAt'];
-    if (dtValue is String) {
-      raw = dtValue;
-      try {
-        parsedDate = DateTime.parse(dtValue);
-      } catch (_) {
-        // ignore parse errors, keep raw string
-      }
-    } else if (dtValue != null) {
-      raw = dtValue.toString();
-    }
-
-    int? guests;
-    final gVal = json['guests'] ?? json['persons'] ?? json['people'];
-    if (gVal is num) {
-      guests = gVal.toInt();
-    } else if (gVal is String) {
-      guests = int.tryParse(gVal);
-    }
-
-    return TableReservation(
-      dateTime: parsedDate,
-      rawDateTime: raw,
-      name: json['name'] as String? ?? json['customerName'] as String?,
-      contacts: json['contacts'] as String? ??
-          json['phone'] as String? ??
-          json['phoneNumber'] as String?,
-      guests: guests,
-      preOrder: json['preorder'] as String? ??
-          json['preOrder'] as String? ??
-          json['pre_order'] as String? ??
-          json['order'] as String?,
-    );
-  }
-
-  String get dateTimeDisplay {
-    if (dateTime != null) {
-      return dateTime.toString();
-    }
-    return rawDateTime ?? 'Не указано';
-  }
-}
-
 class ApiTable {
   final String id;
   final String number;
   final String? zone;
   final int seats;
   final String status;
-  final TableReservation? reservation;
 
   ApiTable({
     required this.id,
@@ -428,36 +339,18 @@ class ApiTable {
     this.zone,
     required this.seats,
     required this.status,
-    this.reservation,
   });
 
   factory ApiTable.fromJson(Map<String, dynamic> json) {
-    TableReservation? reservation;
-
-    // 1. Пытаемся взять reservation с верхнего уровня
-    dynamic resJson = json['reservation'];
-
-    // 2. Если нет — пробуем достать из data.reservation (как в веб-CRM)
-    final data = json['data'];
-    if (resJson == null && data is Map<String, dynamic>) {
-      resJson = data['reservation'];
-    }
-
-    if (resJson is Map<String, dynamic>) {
-      reservation = TableReservation.fromJson(resJson);
-    }
-
     return ApiTable(
-      id: (json['id'] ?? json['_id']).toString(),
+      id: json['id'] as String,
       number: json['number']?.toString() ?? '',
       zone: json['zone'] as String?,
       seats: (json['seats'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? 'free',
-      reservation: reservation,
     );
   }
 }
-
 
 extension TablesApi on ApiClient {
   Future<List<ApiTable>> getTables() async {
