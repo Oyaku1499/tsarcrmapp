@@ -329,14 +329,6 @@ class _TablesData {
   _TablesData(this.tables, this.orders);
 }
 
-
-class _TablesData {
-  final List<ApiTable> tables;
-  final List<ApiOrder> orders;
-
-  _TablesData(this.tables, this.orders);
-}
-
 class _TablesScreenState extends State<TablesScreen> {
   late Future<_TablesData> _future;
 
@@ -506,12 +498,13 @@ class _TablesScreenState extends State<TablesScreen> {
                   mainAxisSpacing: 12,
                   childAspectRatio: 1.1,
                 ),
-                itemBuilder: (context, index) {
-                  final entry = entries[index];
-                  return _TableCard(
-                    tableNumber: entry.key,
-                    orders: entry.value,
-                    onChanged: _reload,
+                  itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return _TableCard(
+                        apiClient: widget.apiClient,
+                        tableNumber: entry.key,
+                        orders: entry.value,
+                        onChanged: _reload,
                   );
                 },
               );
@@ -534,11 +527,13 @@ class _TablesScreenState extends State<TablesScreen> {
 
 class _TableCard extends StatelessWidget {
   const _TableCard({
+    required this.apiClient,
     required this.tableNumber,
     required this.orders,
     required this.onChanged,
   });
 
+  final ApiClient apiClient;
   final String tableNumber;
   final List<ApiOrder> orders;
   final VoidCallback onChanged;
@@ -571,7 +566,6 @@ class _TableCard extends StatelessWidget {
   Future<void> _openCreateOrder(BuildContext context) async {
     if (tableNumber == '—') return;
 
-    final apiClient = apiClientFromContext(context);
     final created = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -587,8 +581,6 @@ class _TableCard extends StatelessWidget {
   }
 
   Future<void> _closeOrder(BuildContext context, ApiOrder order) async {
-    final apiClient = apiClientFromContext(context);
-
     try {
       await apiClient.deleteOrder(order.id);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -744,7 +736,6 @@ class _MenuSelection {
 
 class _CreateOrderDialog extends StatefulWidget {
   const _CreateOrderDialog({
-    super.key,
     required this.apiClient,
     required this.tableNumber,
   });
@@ -1046,7 +1037,7 @@ class _CreateOrderDialogState extends State<_CreateOrderDialog> {
 }
 
 class _MenuPickerDialog extends StatefulWidget {
-  const _MenuPickerDialog({super.key, required this.apiClient});
+  const _MenuPickerDialog({required this.apiClient});
 
   final ApiClient apiClient;
 
@@ -1352,72 +1343,7 @@ class _MenuPickerDialogState extends State<_MenuPickerDialog> {
     );
   }
 }
- extends StatelessWidget {
-  const _TableCard({
-    required this.tableNumber,
-    required this.orders,
-  });
-
-  final String tableNumber;
-  final List<ApiOrder> orders;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final hasOrders = orders.isNotEmpty;
-    final color = hasOrders ? cs.primaryContainer : cs.surfaceVariant;
-
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TableDetailsScreen(
-              apiClient: globalApiClient,
-              tableNumber: tableNumber,
-            ),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Стол $tableNumber',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            if (hasOrders)
-              Text(
-                'Заказов: ${orders.length}',
-                style: TextStyle(
-                  color: cs.onPrimaryContainer.withOpacity(0.9),
-                  fontSize: 12,
-                ),
-              )
-            else
-              Text(
-                'Нет активных заказов',
-                style: TextStyle(
-                  color: cs.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+ 
 // ----------------- MENU SCREEN -----------------
 
 class MenuScreen extends StatefulWidget {
@@ -1633,7 +1559,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           height: 72,
                           margin: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: cs.surfaceVariant,
+                            color: cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.image_outlined),
