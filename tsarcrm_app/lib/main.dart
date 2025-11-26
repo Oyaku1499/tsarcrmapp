@@ -75,6 +75,95 @@ class _WaiterAppState extends State<WaiterApp> {
   }
 }
 
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.background,
+    this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? background;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: background ?? cs.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color ?? Colors.white),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: color ?? Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: (color ?? Colors.white).withOpacity(0.7),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ----------------- LOGIN -----------------
 
 class LoginScreen extends StatefulWidget {
@@ -329,8 +418,17 @@ class _TablesData {
   _TablesData(this.tables, this.orders);
 }
 
+class _TableEntry {
+  const _TableEntry({required this.table, required this.orders});
+
+  final ApiTable table;
+  final List<ApiOrder> orders;
+}
+
+
 class _TablesScreenState extends State<TablesScreen> {
   late Future<_TablesData> _future;
+    String _searchQuery = '';
 
   @override
   void initState() {
@@ -486,27 +584,193 @@ class _TablesScreenState extends State<TablesScreen> {
                 ..sort((a, b) => a.number.compareTo(b.number));
 
               final entries = tables
-                  .map((t) => MapEntry(t.number, byTable[t.number] ?? const []))
-                  .toList();
+                  .map(
+                    (t) => _TableEntry(
+                      table: t,
+                      orders: byTable[t.number] ?? const [],
+                    ),
+                  )
+                          .toList();
 
-              return GridView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: entries.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.1,
-                ),
-                  itemBuilder: (context, index) {
-                      final entry = entries[index];
-                      return _TableCard(
-                        apiClient: widget.apiClient,
-                        tableNumber: entry.key,
-                        orders: entry.value,
-                        onChanged: _reload,
-                  );
-                },
+              final filteredEntries = entries.where((entry) {
+                if (_searchQuery.isEmpty) return true;
+                final query = _searchQuery.toLowerCase();
+                final zone = entry.table.zone?.toLowerCase() ?? '';
+                return entry.table.number.toLowerCase().contains(query) ||
+                    zone.contains(query);
+              }).toList();
+
+              final busyCount = entries
+                  .where((e) => e.orders.isNotEmpty || e.table.status != 'free')
+                  .length;
+
+              return CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              image: const DecorationImage(
+                                image: AssetImage(
+                                  'assets/images/restaurant_lounge.png',
+                                ),
+                                fit: BoxFit.cover,
+                                colorFilter: ColorFilter.mode(
+                                  Colors.black54,
+                                  BlendMode.darken,
+                                ),
+                              ),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.06),
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 16,
+                                  offset: Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: const Icon(
+                                          Icons.table_bar,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              'Управление столами',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              'Создавайте бронирования и следите за статусом залов',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      FilledButton.icon(
+                                        onPressed: _showAddTableDialog,
+                                        icon: const Icon(Icons.add, size: 18),
+                                        label: const Text('Добавить стол'),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              cs.primary.withOpacity(0.95),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    children: [
+                                      _StatChip(
+                                        label: 'Всего',
+                                        value: entries.length.toString(),
+                                        icon: Icons.grid_view_rounded,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _StatChip(
+                                        label: 'Занято',
+                                        value: busyCount.toString(),
+                                        icon: Icons.schedule,
+                                        background: Colors.orange.withOpacity(0.18),
+                                        color: const Color(0xFFFFB366),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _StatChip(
+                                        label: 'Свободно',
+                                        value:
+                                            (entries.length - busyCount).toString(),
+                                        icon: Icons.event_available,
+                                        background: Colors.green.withOpacity(0.18),
+                                        color: const Color(0xFF86EFAC),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Поиск по номеру или зоне…',
+                              prefixIcon: const Icon(Icons.search),
+                              filled: true,
+                              fillColor: cs.surfaceVariant.withOpacity(0.35),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.08),
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() => _searchQuery = value.trim());
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final entry = filteredEntries[index];
+                          return _TableCard(
+                            apiClient: widget.apiClient,
+                            tableEntry: entry,
+                            onChanged: _reload,
+                          );
+                        },
+                        childCount: filteredEntries.length,
+                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.05,
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -528,18 +792,23 @@ class _TablesScreenState extends State<TablesScreen> {
 class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.apiClient,
-    required this.tableNumber,
-    required this.orders,
+    required this.tableEntry,
     required this.onChanged,
   });
 
   final ApiClient apiClient;
-  final String tableNumber;
-  final List<ApiOrder> orders;
+  final _TableEntry tableEntry;
   final VoidCallback onChanged;
 
+    ApiTable get table => tableEntry.table;
+  List<ApiOrder> get orders => tableEntry.orders;
+
   String get _statusLabel {
-    if (orders.isEmpty || tableNumber == '—') return 'Свободен';
+    if (orders.isEmpty || table.number == '—') {
+      if (table.status == 'reserved') return 'Забронирован';
+      if (table.status == 'busy') return 'Занят';
+      return 'Свободен';
+    }
 
     final hasNew = orders.any((o) => o.status == 'new');
     final hasPreparing = orders.any((o) => o.status == 'preparing');
@@ -554,7 +823,13 @@ class _TableCard extends StatelessWidget {
 
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (orders.isEmpty || tableNumber == '—') {
+    if (orders.isEmpty || table.number == '—') {
+      if (table.status == 'reserved') {
+        return const Color(0xFFFACC15);
+      }
+      if (table.status == 'busy') {
+        return const Color(0xFFFB7185);
+      }
       return const Color(0xFF16A34A);
     }
     if (orders.any((o) => o.status == 'completed')) {
@@ -564,14 +839,14 @@ class _TableCard extends StatelessWidget {
   }
 
   Future<void> _openCreateOrder(BuildContext context) async {
-    if (tableNumber == '—') return;
+    if (table.number == '—') return;
 
     final created = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CreateOrderDialog(
         apiClient: apiClient,
-        tableNumber: tableNumber,
+        tableNumber: table.number,
       ),
     );
 
@@ -615,9 +890,24 @@ class _TableCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
+                    image: const DecorationImage(
+            image: AssetImage('assets/images/restaurant_lounge.png'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black54,
+              BlendMode.darken,
+            ),
+          ),
           color: const Color(0xFF020617),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFF1E293B)),
+                    boxShadow: const [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 10,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,59 +915,124 @@ class _TableCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  tableNumber == '—' ? 'Без стола' : 'Стол $tableNumber',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      table.number == '—'
+                          ? 'Без стола'
+                          : 'Стол ${table.number}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _InfoChip(
+                          icon: Icons.event_seat,
+                          label: '${table.seats} мест',
+                        ),
+                        if ((table.zone ?? '').isNotEmpty)
+                          _InfoChip(
+                            icon: Icons.map_outlined,
+                            label: table.zone!,
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _statusColor(context).withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(999),
+                    color: _statusColor(context).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _statusColor(context).withOpacity(0.6),
+                    ),
                   ),
                   child: Text(
                     _statusLabel,
                     style: TextStyle(
-                      fontSize: 10,
+                     fontSize: 11,
+                      fontWeight: FontWeight.w600,
                       color: _statusColor(context),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (lastOrder != null)
               Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: cs.errorContainer.withOpacity(0.15),
+                  color: Colors.white.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                    color: Colors.white.withOpacity(0.06),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Заказ #${lastOrder.id}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Заказ #${lastOrder.id}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          '${lastOrder.total.toStringAsFixed(0)} ₽',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Итого: ${lastOrder.total.toStringAsFixed(0)} ₽',
-                      style: const TextStyle(fontSize: 12),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Создан: ${lastOrder.createdAt.hour.toString().padLeft(2, '0')}:${lastOrder.createdAt.minute.toString().padLeft(2, '0')}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
                         onPressed: () => _closeOrder(context, lastOrder!),
+                                                style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.onPrimary,
+                          side: BorderSide(
+                            color: Colors.white.withOpacity(0.4),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
                         child: const Text('Закрыть заказ'),
                       ),
                     ),
@@ -686,13 +1041,23 @@ class _TableCard extends StatelessWidget {
               )
             else
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'Заказов пока нет',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.outline,
-                  ),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 14,
+                      color: Colors.white.withOpacity(0.65),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Заказов пока нет',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.75),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             const Spacer(),
@@ -700,8 +1065,8 @@ class _TableCard extends StatelessWidget {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed:
-                    tableNumber == '—' ? null : () => _openCreateOrder(context),
-                icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                    table.number == '—' ? null : () => _openCreateOrder(context),
+                                    icon: const Icon(Icons.shopping_cart_outlined, size: 18),
                 label: const Text('Создать заказ'),
               ),
             ),
