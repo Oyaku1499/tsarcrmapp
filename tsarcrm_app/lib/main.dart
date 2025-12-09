@@ -734,7 +734,29 @@ class _TableCard extends StatelessWidget {
   List<ApiOrder> get _activeOrders =>
       orders.where((order) => _isOrderActive(order)).toList();
 
-  bool get hasActiveApiOrder => _activeOrders.isNotEmpty;
+  String get _primaryActionLabel {
+    switch (table.status) {
+      case 'occupied':
+        return 'Закрыть заказ';
+      case 'reserved':
+        return 'Детали';
+      case 'free':
+      default:
+        return 'Создать заказ';
+    }
+  }
+
+  IconData get _primaryActionIcon {
+    switch (table.status) {
+      case 'occupied':
+        return Icons.close_rounded;
+      case 'reserved':
+        return Icons.info_outline;
+      case 'free':
+      default:
+        return Icons.receipt_long_outlined;
+    }
+  }
 
   Future<bool> _confirmCloseOrder(BuildContext context) async {
     final result = await showDialog<bool>(
@@ -818,6 +840,37 @@ class _TableCard extends StatelessWidget {
 
     if (created == true) {
       onChanged();
+    }
+  }
+
+  Future<void> _handlePrimaryAction(
+    BuildContext context, {
+    ApiOrder? activeOrder,
+  }) async {
+    switch (table.status) {
+      case 'occupied':
+        if (activeOrder != null) {
+          final confirmed = await _confirmCloseOrder(context);
+          if (confirmed) await _closeOrder(context, activeOrder);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Нет активного заказа для закрытия'),
+            ),
+          );
+        }
+        break;
+      case 'reserved':
+        if (table.reservation != null) {
+          await _openReservationDetails(context);
+        } else {
+          await _openOrderDetails(context);
+        }
+        break;
+      case 'free':
+      default:
+        await _openCreateOrder(context);
+        break;
     }
   }
 
@@ -1202,32 +1255,12 @@ class _TableCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    if (hasActiveApiOrder && lastOrder != null) {
-                      _confirmCloseOrder(context).then((confirmed) {
-                        if (confirmed) _closeOrder(context, lastOrder!);
-                      });
-                    } else if (hasApiOrder || hasTableOrder) {
-                      _openOrderDetails(context);
-                    } else if (reservation != null) {
-                      _openReservationDetails(context);
-                    } else {
-                      _openCreateOrder(context);
-                    }
-                  },
-                  icon: Icon(
-                    hasActiveApiOrder
-                        ? Icons.close_rounded
-                        : Icons.receipt_long_outlined,
-                    size: 18,
+                    onPressed: () => _handlePrimaryAction(
+                    context,
+                    activeOrder: lastOrder,
                   ),
-                  label: Text(
-                    hasActiveApiOrder
-                        ? 'Закрыть заказ'
-                        : hasApiOrder || hasTableOrder || reservation != null
-                            ? 'Детали'
-                            : 'Создать заказ',
-                  ),
+                  icon: Icon(_primaryActionIcon, size: 18),
+                  label: Text(_primaryActionLabel),
                 ),
               ),
             ],
