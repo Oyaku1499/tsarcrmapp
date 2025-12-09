@@ -96,7 +96,7 @@ class _WaiterAppState extends State<WaiterApp> {
                 const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-            dialogTheme: DialogTheme(
+            dialogTheme: DialogThemeData(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -170,7 +170,7 @@ class _WaiterAppState extends State<WaiterApp> {
                 const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-            dialogTheme: DialogTheme(
+            dialogTheme: DialogThemeData(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -1087,10 +1087,10 @@ class _TableCard extends StatelessWidget {
                 icon: Icons.chair_alt_outlined,
                 label: '${table.seats} мест',
               ),
-              if (table.zone.isNotEmpty)
+              if ((table.zone ?? '').isNotEmpty)
                 _InfoChip(
                   icon: Icons.place_outlined,
-                  label: table.zone,
+                  label: table.zone ?? '',
                 ),
             ],
           ),
