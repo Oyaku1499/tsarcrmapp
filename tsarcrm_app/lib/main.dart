@@ -725,6 +725,28 @@ class _TableCard extends StatelessWidget {
   bool get hasActiveApiOrder =>
       orders.any((order) => order.status != 'completed');
 
+  Future<bool> _confirmCloseOrder(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Закрытие заказа'),
+        content: const Text('Подтверждаете закрытие заказа?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Нет'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Да'),
+          ),
+        ],
+      ),
+    );
+
+    return result == true;
+  }
+
   String get _statusLabel {
     switch (table.status) {
       case 'occupied':
@@ -964,8 +986,11 @@ class _TableCard extends StatelessWidget {
                           backgroundColor: Colors.white.withOpacity(0.08),
                         ),
                         onPressed: () async {
-                          Navigator.of(context).pop();
-                          await _closeOrder(context, activeOrder!);
+                          final confirmed = await _confirmCloseOrder(context);
+                          if (confirmed) {
+                            Navigator.of(context).pop();
+                            await _closeOrder(context, activeOrder!);
+                          }
                         },
                         child: const Text('Закрыть заказ'),
                       ),
@@ -1163,7 +1188,9 @@ class _TableCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     if (hasActiveApiOrder && lastOrder != null) {
-                      _closeOrder(context, lastOrder);
+                      _confirmCloseOrder(context).then((confirmed) {
+                        if (confirmed) _closeOrder(context, lastOrder);
+                      });
                     } else if (hasApiOrder || hasTableOrder) {
                       _openOrderDetails(context);
                     } else if (reservation != null) {
