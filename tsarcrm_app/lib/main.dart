@@ -722,6 +722,9 @@ class _TableCard extends StatelessWidget {
 
   String get tableNumber => table.number;
 
+  bool get hasActiveApiOrder =>
+      orders.any((order) => order.status != 'completed');
+
   String get _statusLabel {
     switch (table.status) {
       case 'occupied':
