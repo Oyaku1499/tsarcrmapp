@@ -683,7 +683,7 @@ class _TablesScreenState extends State<TablesScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 0.9,
+                        childAspectRatio: 0.82
                       ),
                       itemBuilder: (context, index) {
                         final table = filteredTables[index];
