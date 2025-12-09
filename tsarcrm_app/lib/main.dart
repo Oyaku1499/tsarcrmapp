@@ -1155,7 +1155,7 @@ class _TableCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (hasApiOrder && lastOrder != null)
             _OrderBadge(
-              title: 'Активный заказ #${lastOrder.id}',
+              title: 'Активный заказ',
               subtitle: 'Итого: ${lastOrder.total.toStringAsFixed(0)} ₽',
               accent: cs.error,
               onTap: () => _openOrderDetails(context),
