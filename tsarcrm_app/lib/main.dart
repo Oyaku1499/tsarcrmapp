@@ -75,95 +75,6 @@ class _WaiterAppState extends State<WaiterApp> {
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.background,
-    this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color? background;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: background ?? cs.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color ?? Colors.white),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: color ?? Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: (color ?? Colors.white).withOpacity(0.7),
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ----------------- LOGIN -----------------
 
 class LoginScreen extends StatefulWidget {
@@ -418,17 +329,10 @@ class _TablesData {
   _TablesData(this.tables, this.orders);
 }
 
-class _TableEntry {
-  const _TableEntry({required this.table, required this.orders});
-
-  final ApiTable table;
-  final List<ApiOrder> orders;
-}
-
-
 class _TablesScreenState extends State<TablesScreen> {
   late Future<_TablesData> _future;
-    String _searchQuery = '';
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -436,14 +340,21 @@ class _TablesScreenState extends State<TablesScreen> {
     _future = _load();
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<_TablesData> _load() async {
-    final results = await Future.wait([
-      widget.apiClient.getTables(),
-      widget.apiClient.getOrders(),
-    ]);
+    // Загружаем только карту столов (TableMap) из CRM.
+    final tables = await widget.apiClient.getTables();
+
+    // Заказы из отдельного эндпоинта /orders больше не подгружаем.
+    // Вся информация о заказах и бронях берётся из карты столов (TableMap).
     return _TablesData(
-      results[0] as List<ApiTable>,
-      results[1] as List<ApiOrder>,
+      tables,
+      const <ApiOrder>[],
     );
   }
 
@@ -551,12 +462,18 @@ class _TablesScreenState extends State<TablesScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
+                String message = 'Ошибка загрузки столов';
+                final error = snapshot.error;
+                if (error is ApiException && error.statusCode == 401) {
+                  message = 'Ошибка авторизации (401). Проверьте логин и пароль в CRM.';
+                }
                 return ListView(
                   children: [
                     const SizedBox(height: 80),
                     Center(
                       child: Text(
-                        'Ошибка загрузки столов',
+                        message,
+                        textAlign: TextAlign.center,
                         style: TextStyle(color: cs.error),
                       ),
                     ),
@@ -583,205 +500,57 @@ class _TablesScreenState extends State<TablesScreen> {
               final tables = [...data.tables]
                 ..sort((a, b) => a.number.compareTo(b.number));
 
-              final entries = tables
-                  .map(
-                    (t) => _TableEntry(
-                      table: t,
-                      orders: byTable[t.number] ?? const [],
-                    ),
-                  )
-                          .toList();
+              final query = _searchQuery.trim();
+              final filteredTables = query.isEmpty
+                  ? tables
+                  : tables
+                      .where((t) => t.number.toLowerCase().contains(query.toLowerCase()))
+                      .toList();
 
-              final filteredEntries = entries.where((entry) {
-                if (_searchQuery.isEmpty) return true;
-                final query = _searchQuery.toLowerCase();
-                final zone = entry.table.zone?.toLowerCase() ?? '';
-                return entry.table.number.toLowerCase().contains(query) ||
-                    zone.contains(query);
-              }).toList();
-
-              final busyCount = entries
-                  .where((e) => e.orders.isNotEmpty || e.table.status != 'free')
-                  .length;
-
-              return CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              image: const DecorationImage(
-                                image: AssetImage(
-                                  'assets/images/restaurant_lounge.png',
-                                ),
-                                fit: BoxFit.cover,
-                                colorFilter: ColorFilter.mode(
-                                  Colors.black54,
-                                  BlendMode.darken,
-                                ),
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.06),
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x33000000),
-                                  blurRadius: 16,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(14),
-                                        ),
-                                        child: const Icon(
-                                          Icons.table_bar,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: const [
-                                            Text(
-                                              'Управление столами',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            Text(
-                                              'Создавайте бронирования и следите за статусом залов',
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      FilledButton.icon(
-                                        onPressed: _showAddTableDialog,
-                                        icon: const Icon(Icons.add, size: 18),
-                                        label: const Text('Добавить стол'),
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor:
-                                              cs.primary.withOpacity(0.95),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      _StatChip(
-                                        label: 'Всего',
-                                        value: entries.length.toString(),
-                                        icon: Icons.grid_view_rounded,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _StatChip(
-                                        label: 'Занято',
-                                        value: busyCount.toString(),
-                                        icon: Icons.schedule,
-                                        background: Colors.orange.withOpacity(0.18),
-                                        color: const Color(0xFFFFB366),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _StatChip(
-                                        label: 'Свободно',
-                                        value:
-                                            (entries.length - busyCount).toString(),
-                                        icon: Icons.event_available,
-                                        background: Colors.green.withOpacity(0.18),
-                                        color: const Color(0xFF86EFAC),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Поиск по номеру или зоне…',
-                              prefixIcon: const Icon(Icons.search),
-                              filled: true,
-                              fillColor: cs.surfaceVariant.withOpacity(0.35),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.08),
-                                ),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() => _searchQuery = value.trim());
-                            },
-                          ),
-                        ],
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Поиск по номеру стола',
+                        isDense: true,
                       ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
                     ),
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    sliver: SliverGrid(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final entry = filteredEntries[index];
-                          return _TableCard(
-                            apiClient: widget.apiClient,
-                            tableEntry: entry,
-                            onChanged: _reload,
-                          );
-                        },
-                        childCount: filteredEntries.length,
-                      ),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredTables.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 1.05,
+                        childAspectRatio: 0.85,
                       ),
+                      itemBuilder: (context, index) {
+                        final table = filteredTables[index];
+                        final tableOrders = byTable[table.number] ?? const <ApiOrder>[];
+                        return _TableCard(
+                          apiClient: widget.apiClient,
+                          table: table,
+                          orders: tableOrders,
+                          onChanged: _reload,
+                        );
+                      },
                     ),
                   ),
                 ],
               );
             },
-          ),
-        ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton.extended(
-            onPressed: _showAddTableDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Новый стол'),
           ),
         ),
       ],
@@ -792,61 +561,62 @@ class _TablesScreenState extends State<TablesScreen> {
 class _TableCard extends StatelessWidget {
   const _TableCard({
     required this.apiClient,
-    required this.tableEntry,
+    required this.table,
+    required this.orders,
     required this.onChanged,
   });
 
   final ApiClient apiClient;
-  final _TableEntry tableEntry;
+  final ApiTable table;
+  final List<ApiOrder> orders;
   final VoidCallback onChanged;
 
-    ApiTable get table => tableEntry.table;
-  List<ApiOrder> get orders => tableEntry.orders;
+  String get tableNumber => table.number;
 
   String get _statusLabel {
-    if (orders.isEmpty || table.number == '—') {
-      if (table.status == 'reserved') return 'Забронирован';
-      if (table.status == 'busy') return 'Занят';
-      return 'Свободен';
+    switch (table.status) {
+      case 'occupied':
+        return 'Занят';
+      case 'reserved':
+        return 'Забронирован';
+      case 'free':
+      default:
+        return 'Свободен';
     }
-
-    final hasNew = orders.any((o) => o.status == 'new');
-    final hasPreparing = orders.any((o) => o.status == 'preparing');
-    final hasCompleted = orders.any((o) => o.status == 'completed');
-
-    if (hasCompleted) return 'Ожидает счёт';
-    if (hasPreparing) return 'Готовится';
-    if (hasNew) return 'Новый заказ';
-
-    return 'Заказ';
   }
 
   Color _statusColor(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (orders.isEmpty || table.number == '—') {
-      if (table.status == 'reserved') {
-        return const Color(0xFFFACC15);
-      }
-      if (table.status == 'busy') {
-        return const Color(0xFFFB7185);
-      }
-      return const Color(0xFF16A34A);
+    switch (table.status) {
+      case 'occupied':
+        return cs.error;
+      case 'reserved':
+        return cs.tertiary;
+      case 'free':
+      default:
+        return const Color(0xFF16A34A);
     }
-    if (orders.any((o) => o.status == 'completed')) {
-      return const Color(0xFFF97316);
-    }
-    return cs.primary;
   }
 
   Future<void> _openCreateOrder(BuildContext context) async {
-    if (table.number == '—') return;
+    if (tableNumber == '—') return;
+
+    // Новый заказ можно создавать только для свободного стола
+    if (table.status != 'free') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Новый заказ можно создать только для свободного стола'),
+        ),
+      );
+      return;
+    }
 
     final created = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CreateOrderDialog(
         apiClient: apiClient,
-        tableNumber: table.number,
+        tableNumber: tableNumber,
       ),
     );
 
@@ -857,7 +627,8 @@ class _TableCard extends StatelessWidget {
 
   Future<void> _closeOrder(BuildContext context, ApiOrder order) async {
     try {
-      await apiClient.deleteOrder(order.id);
+      // Меняем статус заказа на completed (закрыт) вместо удаления
+      await apiClient.updateOrderStatus(order.id, 'completed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Заказ ${order.id} закрыт')),
       );
@@ -873,41 +644,233 @@ class _TableCard extends StatelessWidget {
     }
   }
 
+
+  Future<void> _openOrderDetails(BuildContext context) async {
+    final items = table.orders;
+    final total = table.totalAmount ??
+        items.fold<double>(0, (sum, item) => sum + item.amount);
+
+    if (items.isEmpty && total == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет данных о заказе для этого стола')),
+      );
+      return;
+    }
+
+    // Ищем активный заказ из общего списка заказов (/orders)
+    ApiOrder? activeOrder;
+    if (orders.isNotEmpty) {
+      final active = orders.where((o) => o.status != 'completed').toList();
+      if (active.isNotEmpty) {
+        active.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        activeOrder = active.first;
+      }
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF020617),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tableNumber == '—'
+                              ? 'Заказ'
+                              : 'Заказ для стола $tableNumber',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return ListTile(
+                          title: Text(item.name),
+                          subtitle: Text(
+                            '${item.quantity} × ${item.price.toStringAsFixed(0)} ₽',
+                          ),
+                          trailing: Text(
+                            '${item.amount.toStringAsFixed(0)} ₽',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Итого:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        '${total.toStringAsFixed(0)} ₽',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            // TODO: реализовать редактирование заказа через API таблиц/заказов
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Редактирование заказа пока не реализовано'),
+                              ),
+                            );
+                          },
+                          child: const Text('Редактировать заказ'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (activeOrder != null)
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await _closeOrder(context, activeOrder!);
+                            },
+                            child: const Text('Закрыть заказ'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openReservationDetails(BuildContext context) async {
+    final reservation = table.reservation;
+    if (reservation == null) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            tableNumber == '—' ? 'Бронь' : 'Бронь стола $tableNumber',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Дата и время',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 2),
+              Text(reservation.time),
+              const SizedBox(height: 8),
+              const Text(
+                'Контакт (имя/телефон)',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 2),
+              Text(reservation.contact ?? '—'),
+              const SizedBox(height: 8),
+              const Text(
+                'Количество гостей',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 2),
+              Text(reservation.guests.toString()),
+              const SizedBox(height: 8),
+              const Text(
+                'Комментарий / предзаказ',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 2),
+              Text(reservation.preorder ?? '—'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    // Заказ из общего списка заказов (API /orders)
+    final hasApiOrder = orders.isNotEmpty;
     ApiOrder? lastOrder;
-    if (orders.isNotEmpty) {
+    if (hasApiOrder) {
       final sorted = [...orders]..sort(
           (a, b) => b.createdAt.compareTo(a.createdAt),
         );
       lastOrder = sorted.first;
     }
 
+    // Данные карты столов из CRM (используем только бронь)
+    final reservation = table.reservation;
+
     return GestureDetector(
-      onTap: () => _openCreateOrder(context),
+      onTap: () {
+        if (hasApiOrder && lastOrder != null) {
+          _openOrderDetails(context);
+        } else if (reservation != null) {
+          _openReservationDetails(context);
+        } else {
+          _openCreateOrder(context);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-                    image: const DecorationImage(
-            image: AssetImage('assets/images/restaurant_lounge.png'),
-            fit: BoxFit.cover,
-            colorFilter: ColorFilter.mode(
-              Colors.black54,
-              BlendMode.darken,
-            ),
-          ),
           color: const Color(0xFF020617),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFF1E293B)),
-                    boxShadow: const [
-            BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 10,
-              offset: Offset(0, 6),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -915,158 +878,108 @@ class _TableCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      table.number == '—'
-                          ? 'Без стола'
-                          : 'Стол ${table.number}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _InfoChip(
-                          icon: Icons.event_seat,
-                          label: '${table.seats} мест',
-                        ),
-                        if ((table.zone ?? '').isNotEmpty)
-                          _InfoChip(
-                            icon: Icons.map_outlined,
-                            label: table.zone!,
-                          ),
-                      ],
-                    ),
-                  ],
+                Text(
+                  tableNumber == '—' ? 'Без стола' : 'Стол $tableNumber',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _statusColor(context).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _statusColor(context).withOpacity(0.6),
-                    ),
+                    color: _statusColor(context).withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     _statusLabel,
                     style: TextStyle(
-                     fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
                       color: _statusColor(context),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            if (lastOrder != null)
+            const SizedBox(height: 8),
+            if (hasApiOrder || reservation != null)
               Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: cs.errorContainer.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                    color: Colors.white.withOpacity(0.06),
-                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Заказ #${lastOrder.id}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Colors.white,
-                          ),
+                    if (hasApiOrder && lastOrder != null) ...[
+                      Text(
+                        'Заказ #${lastOrder.id}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
-                        Text(
-                          '${lastOrder.total.toStringAsFixed(0)} ₽',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 14,
-                          color: Colors.white.withOpacity(0.7),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          "Создан: ${lastOrder.createdAt.hour.toString().padLeft(2, '0')}:${lastOrder.createdAt.minute.toString().padLeft(2, '0')}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => _closeOrder(context, lastOrder!),
-                                                style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.onPrimary,
-                          side: BorderSide(
-                            color: Colors.white.withOpacity(0.4),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                        child: const Text('Закрыть заказ'),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Итого: ${lastOrder.total.toStringAsFixed(0)} ₽',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                    if (reservation != null) ...[
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Бронь',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Время: ${reservation.time}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        'Гостей: ${reservation.guests}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                    if (hasApiOrder && lastOrder != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => _closeOrder(context, lastOrder!),
+                            child: const Text('Закрыть заказ'),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               )
             else
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 14,
-                      color: Colors.white.withOpacity(0.65),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Заказов пока нет',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.75),
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Заказов пока нет',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.outline,
+                  ),
                 ),
               ),
             const Spacer(),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed:
-                    table.number == '—' ? null : () => _openCreateOrder(context),
-                                    icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                onPressed: (tableNumber == '—' || hasApiOrder || reservation != null || table.status != 'free')
+                    ? null
+                    : () => _openCreateOrder(context),
+                icon: const Icon(Icons.shopping_cart_outlined, size: 18),
                 label: const Text('Создать заказ'),
               ),
             ),
