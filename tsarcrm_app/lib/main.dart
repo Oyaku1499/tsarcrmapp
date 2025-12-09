@@ -777,128 +777,128 @@ class _TableCard extends StatelessWidget {
         final mutedTextColor = cs.onSurface.withOpacity(0.7);
 
         return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: Text('Закрытие стола $tableNumber'),
-            content: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Сумма заказа:',
-                    style: TextStyle(
-                      color: mutedTextColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${order.total.toStringAsFixed(0)} ₽',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Способ оплаты:',
-                    style: TextStyle(
-                      color: mutedTextColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ...paymentOptions.map((option) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: RadioListTile<String>(
-                        value: option.$1,
-                        groupValue: selectedMethod,
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => selectedMethod = value);
-                          }
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: cs.onSurface.withOpacity(0.08)),
-                        ),
-                        tileColor: cs.surfaceVariant.withOpacity(0.16),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        title: Row(
-                          children: [
-                            Icon(option.$3, color: cs.primary),
-                            const SizedBox(width: 10),
-                            Text(option.$2),
-                          ],
-                        ),
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Закрытие стола $tableNumber'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Сумма заказа:',
+                      style: TextStyle(
+                        color: mutedTextColor,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  }),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: cs.secondaryContainer.withOpacity(0.28),
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Итого к оплате:',
-                              style: TextStyle(
-                                color: cs.onSecondaryContainer,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              selectedMethod == 'cash'
-                                  ? 'Оплата будет принята наличными'
-                                  : 'Оплата будет принята картой',
-                              style: TextStyle(
-                                color: cs.onSecondaryContainer.withOpacity(0.8),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${order.total.toStringAsFixed(2)} ₽',
-                          style: TextStyle(
-                            color: cs.onSecondaryContainer,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                    const SizedBox(height: 6),
+                    Text(
+                      '${order.total.toStringAsFixed(0)} ₽',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Способ оплаты:',
+                      style: TextStyle(
+                        color: mutedTextColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ...paymentOptions.map((option) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: RadioListTile<String>(
+                          value: option.$1,
+                          groupValue: selectedMethod,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => selectedMethod = value);
+                            }
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: cs.onSurface.withOpacity(0.08)),
+                          ),
+                          tileColor: cs.surfaceVariant.withOpacity(0.16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          title: Row(
+                            children: [
+                              Icon(option.$3, color: cs.primary),
+                              const SizedBox(width: 10),
+                              Text(option.$2),
+                            ],
                           ),
                         ),
-                      ],
+                      );
+                    }),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: cs.secondaryContainer.withOpacity(0.28),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Итого к оплате:',
+                                style: TextStyle(
+                                  color: cs.onSecondaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                selectedMethod == 'cash'
+                                    ? 'Оплата будет принята наличными'
+                                    : 'Оплата будет принята картой',
+                                style: TextStyle(
+                                  color: cs.onSecondaryContainer.withOpacity(0.8),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${order.total.toStringAsFixed(2)} ₽',
+                            style: TextStyle(
+                              color: cs.onSecondaryContainer,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             actions: [
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Провести оплату'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Провести оплату'),
+                ),
+              ],
+            );
+          },
+        );
 
     return result == true;
   }
