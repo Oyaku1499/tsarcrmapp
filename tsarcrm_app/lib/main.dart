@@ -830,7 +830,7 @@ class _TableCard extends StatelessWidget {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFF0B1728),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -841,8 +841,9 @@ class _TableCard extends StatelessWidget {
           maxChildSize: 0.9,
           minChildSize: 0.4,
           builder: (context, scrollController) {
+            final mutedTextColor = Colors.white.withOpacity(0.7);
             return Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -856,44 +857,74 @@ class _TableCard extends StatelessWidget {
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
+                        color: Colors.white,
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Expanded(
-                    child: ListView.builder(
+                    child: ListView.separated(
                       controller: scrollController,
                       itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final item = items[index];
-                        return ListTile(
-                          title: Text(item.name),
-                          subtitle: Text(
-                            '${item.quantity} × ${item.price.toStringAsFixed(0)} ₽',
-                          ),
-                          trailing: Text(
-                            '${item.amount.toStringAsFixed(0)} ₽',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${item.amount.toStringAsFixed(0)} ₽',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${item.quantity} × ${item.price.toStringAsFixed(0)} ₽',
+                              style: TextStyle(color: mutedTextColor),
+                            ),
+                          ],
                         );
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.white.withOpacity(0.08)),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Итого:',
+                        'Итого',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           fontSize: 16,
+                          color: Colors.white,
                         ),
                       ),
                       Text(
@@ -905,35 +936,38 @@ class _TableCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            // TODO: реализовать редактирование заказа через API таблиц/заказов
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Редактирование заказа пока не реализовано'),
-                              ),
-                            );
-                          },
-                          child: const Text('Редактировать заказ'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (activeOrder != null)
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              Navigator.of(context).pop();
-                              await _closeOrder(context, activeOrder!);
-                            },
-                            child: const Text('Закрыть заказ'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        // TODO: реализовать редактирование заказа через API таблиц/заказов
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Редактирование заказа пока не реализовано'),
                           ),
-                        ),
-                    ],
+                        );
+                      },
+                      child: const Text('Редактировать заказ'),
+                    ),
                   ),
+                  if (activeOrder != null) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.white.withOpacity(0.08),
+                        ),
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _closeOrder(context, activeOrder!);
+                        },
+                        child: const Text('Закрыть заказ'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -1125,7 +1159,9 @@ class _TableCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    if (hasApiOrder && lastOrder != null) {
+                    if (hasActiveApiOrder && lastOrder != null) {
+                      _closeOrder(context, lastOrder);
+                    } else if (hasApiOrder || hasTableOrder) {
                       _openOrderDetails(context);
                     } else if (reservation != null) {
                       _openReservationDetails(context);
@@ -1135,9 +1171,11 @@ class _TableCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.receipt_long_outlined, size: 18),
                   label: Text(
-                    hasApiOrder || hasTableOrder || reservation != null
-                        ? 'Детали'
-                        : 'Создать заказ',
+                    hasActiveApiOrder
+                        ? 'Закрыть заказ'
+                        : hasApiOrder || hasTableOrder || reservation != null
+                            ? 'Детали'
+                            : 'Создать заказ',
                   ),
                 ),
               ),
