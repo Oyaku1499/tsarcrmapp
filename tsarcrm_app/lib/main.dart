@@ -1189,7 +1189,7 @@ class _TableCard extends StatelessWidget {
                   onPressed: () {
                     if (hasActiveApiOrder && lastOrder != null) {
                       _confirmCloseOrder(context).then((confirmed) {
-                        if (confirmed) _closeOrder(context, lastOrder);
+                        if (confirmed) _closeOrder(context, lastOrder!);
                       });
                     } else if (hasApiOrder || hasTableOrder) {
                       _openOrderDetails(context);
