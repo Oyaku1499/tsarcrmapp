@@ -473,11 +473,13 @@ class _TablesScreenState extends State<TablesScreen> {
     // Загружаем только карту столов (TableMap) из CRM.
     final tables = await widget.apiClient.getTables();
 
-    // Заказы из отдельного эндпоинта /orders больше не подгружаем.
-    // Вся информация о заказах и бронях берётся из карты столов (TableMap).
+     // Дополнительно загружаем список заказов, чтобы иметь возможность
+    // закрывать их прямо из модального окна деталей заказа.
+    final orders = await widget.apiClient.getOrders();
+
     return _TablesData(
       tables,
-      const <ApiOrder>[],
+      orders,
     );
   }
 
