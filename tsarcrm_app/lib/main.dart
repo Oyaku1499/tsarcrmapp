@@ -2,6 +2,32 @@
 import 'package:flutter/material.dart';
 import 'api_client.dart';
 
+/// Глобальный провайдер коэффициента масштабирования интерфейса.
+///
+/// Значение зависит от ширины экрана: при ширине около 390px (iPhone 14)
+/// коэффициент равен 1.0, на более узких устройствах уменьшается, а на
+/// широких — растёт, но в пределах установленного диапазона.
+class UiScale extends InheritedWidget {
+  const UiScale({
+    super.key,
+    required this.factor,
+    required super.child,
+  });
+
+  final double factor;
+
+  static double of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<UiScale>()?.factor ?? 1;
+
+  @override
+  bool updateShouldNotify(UiScale oldWidget) => oldWidget.factor != factor;
+}
+
+/// Расширение для быстрого масштабирования числовых значений.
+extension ScaleExtension on num {
+  double scaled(BuildContext context) => this * UiScale.of(context);
+}
+
 final globalApiClient = ApiClient();
 
 void main() {
@@ -22,6 +48,13 @@ class _WaiterAppState extends State<WaiterApp> {
   AuthUser? _user;
   bool _isDarkMode = true;
 
+  double _scaleForSize(Size size) {
+    const baseWidth = 390.0; // ширина макета
+    final width = size.shortestSide;
+    final factor = width / baseWidth;
+    return factor.clamp(0.85, 1.25);
+  }
+
   @override
   Widget build(BuildContext context) {
     const seed = Color(0xFFFF8A00); // тёплый оранжевый как в web-прототипе
@@ -33,6 +66,7 @@ class _WaiterAppState extends State<WaiterApp> {
         ? ThemeData(
             useMaterial3: true,
             brightness: Brightness.dark,
+            visualDensity: VisualDensity.adaptivePlatformDensity,
             colorScheme: ColorScheme.fromSeed(
               seedColor: seed,
               brightness: Brightness.dark,
@@ -107,6 +141,7 @@ class _WaiterAppState extends State<WaiterApp> {
         : ThemeData(
             useMaterial3: true,
             brightness: Brightness.light,
+            visualDensity: VisualDensity.adaptivePlatformDensity,
             colorScheme: ColorScheme.fromSeed(
               seedColor: seed,
               brightness: Brightness.light,
@@ -183,6 +218,19 @@ class _WaiterAppState extends State<WaiterApp> {
       debugShowCheckedModeBanner: false,
       title: 'Restaurant CRM',
       theme: theme,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final scale = _scaleForSize(mq.size);
+        final textScaler = TextScaler.linear(scale);
+
+        return UiScale(
+          factor: scale,
+          child: MediaQuery(
+            data: mq.copyWith(textScaler: textScaler),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       home: _user == null
           ? LoginScreen(
               apiClient: widget.apiClient,
@@ -262,25 +310,30 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            padding: EdgeInsets.fromLTRB(
+              24.scaled(context),
+              24.scaled(context),
+              24.scaled(context),
+              32.scaled(context),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 32),
+                SizedBox(height: 32.scaled(context)),
                 Container(
-                  width: 96,
-                  height: 96,
+                  width: 96.scaled(context),
+                  height: 96.scaled(context),
                   decoration: BoxDecoration(
                     color: cs.primary.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.restaurant_menu,
-                    size: 44,
+                    size: 44.scaled(context),
                     color: cs.primary,
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24.scaled(context)),
                 Text(
                   'Вход в CRM',
                   style: Theme.of(context)
@@ -288,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       .headlineSmall
                       ?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8.scaled(context)),
                 Text(
                   'Авторизуйтесь, чтобы работать со столами и заказами',
                   textAlign: TextAlign.center,
@@ -297,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       .bodyMedium
                       ?.copyWith(color: cs.onSurface.withOpacity(0.7)),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32.scaled(context)),
                 Form(
                   key: _formKey,
                   child: Column(
@@ -328,13 +381,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12.scaled(context)),
                   Text(
                     _error!,
                     style: TextStyle(color: cs.error),
                   ),
                 ],
-                const SizedBox(height: 24),
+                SizedBox(height: 24.scaled(context)),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -680,23 +733,33 @@ class _TablesScreenState extends State<TablesScreen> {
                   ),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: filteredTables.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.82
-                      ),
-                      itemBuilder: (context, index) {
-                        final table = filteredTables[index];
-                        final tableOrders = byTable[table.number] ?? const <ApiOrder>[];
-                        return _TableCard(
-                          apiClient: widget.apiClient,
-                          table: table,
-                          orders: tableOrders,
-                          onChanged: _reload,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final targetWidth = 260.scaled(context);
+                        final crossAxisCount =
+                            (constraints.maxWidth / targetWidth).floor().clamp(2, 4);
+
+                        return GridView.builder(
+                          padding: EdgeInsets.all(16.scaled(context)),
+                          itemCount: filteredTables.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12.scaled(context),
+                            mainAxisSpacing: 12.scaled(context),
+                            childAspectRatio: 0.82,
+                          ),
+                          itemBuilder: (context, index) {
+                            final table = filteredTables[index];
+                            final tableOrders =
+                                byTable[table.number] ?? const <ApiOrder>[];
+                            return _TableCard(
+                              apiClient: widget.apiClient,
+                              table: table,
+                              orders: tableOrders,
+                              onChanged: _reload,
+                            );
+                          },
                         );
                       },
                     ),
