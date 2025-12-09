@@ -1199,7 +1199,12 @@ class _TableCard extends StatelessWidget {
                       _openCreateOrder(context);
                     }
                   },
-                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  icon: Icon(
+                    hasActiveApiOrder
+                        ? Icons.close_rounded
+                        : Icons.receipt_long_outlined,
+                    size: 18,
+                  ),
                   label: Text(
                     hasActiveApiOrder
                         ? 'Закрыть заказ'
