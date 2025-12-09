@@ -615,8 +615,10 @@ class _TablesScreenState extends State<TablesScreen> {
                 );
               }
 
+              const closedStatuses = {'completed', 'cancelled', 'deleted'};
               final byTable = <String, List<ApiOrder>>{};
               for (final o in data.orders) {
+                if (closedStatuses.contains(o.status)) continue;
                 final key = o.tableNumber ?? '';
                 if (key.isEmpty) continue;
                 byTable.putIfAbsent(key, () => []).add(o);
@@ -724,8 +726,15 @@ class _TableCard extends StatelessWidget {
 
   String get tableNumber => table.number;
 
-  bool get hasActiveApiOrder =>
-      orders.any((order) => order.status != 'completed');
+  bool _isOrderActive(ApiOrder order) {
+    const closedStatuses = {'completed', 'cancelled', 'deleted'};
+    return !closedStatuses.contains(order.status);
+  }
+
+  List<ApiOrder> get _activeOrders =>
+      orders.where((order) => _isOrderActive(order)).toList();
+
+  bool get hasActiveApiOrder => _activeOrders.isNotEmpty;
 
   Future<bool> _confirmCloseOrder(BuildContext context) async {
     final result = await showDialog<bool>(
@@ -837,7 +846,10 @@ class _TableCard extends StatelessWidget {
     final total = table.totalAmount ??
         items.fold<double>(0, (sum, item) => sum + item.amount);
 
-    if (items.isEmpty && total == 0) {
+    final hasCrmOrderOrReservation =
+        items.isNotEmpty || total > 0 || table.reservation != null || table.status != 'free';
+
+    if (!hasCrmOrderOrReservation) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Нет данных о заказе для этого стола')),
       );
@@ -845,13 +857,11 @@ class _TableCard extends StatelessWidget {
     }
 
     // Ищем активный заказ из общего списка заказов (/orders)
+    final active = _activeOrders;
     ApiOrder? activeOrder;
-    if (orders.isNotEmpty) {
-      final active = orders.where((o) => o.status != 'completed').toList();
-      if (active.isNotEmpty) {
-        active.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        activeOrder = active.first;
-      }
+    if (hasCrmOrderOrReservation && active.isNotEmpty) {
+      active.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      activeOrder = active.first;
     }
 
     await showModalBottomSheet(
@@ -1070,22 +1080,26 @@ class _TableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Заказ из общего списка заказов (API /orders)
-    final hasApiOrder = orders.isNotEmpty;
-    ApiOrder? lastOrder;
-    if (hasApiOrder) {
-      final sorted = [...orders]..sort(
-          (a, b) => b.createdAt.compareTo(a.createdAt),
-        );
-      lastOrder = sorted.first;
-    }
-
     // Данные карты столов из CRM (используем только бронь)
     final reservation = table.reservation;
     final tableItems = table.orders;
     final tableTotal = table.totalAmount ??
         tableItems.fold<double>(0, (sum, item) => sum + item.amount);
     final hasTableOrder = tableItems.isNotEmpty || tableTotal > 0;
+    final crmHasOrderOrReservation =
+        hasTableOrder || reservation != null || table.status != 'free';
+
+    // Заказ из общего списка заказов (API /orders)
+    final apiOrders = crmHasOrderOrReservation ? _activeOrders : const <ApiOrder>[];
+    final hasApiOrder = apiOrders.isNotEmpty;
+    ApiOrder? lastOrder;
+    if (hasApiOrder) {
+      final sorted = [...apiOrders]..sort(
+          (a, b) => b.createdAt.compareTo(a.createdAt),
+        );
+      lastOrder = sorted.first;
+    }
+
     final statusColor = _statusColor(context);
     final formattedReservationTime =
         reservation != null ? _formatReservationTime(reservation.time) : '';
