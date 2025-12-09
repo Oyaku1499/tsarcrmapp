@@ -656,12 +656,6 @@ class _TablesScreenState extends State<TablesScreen> {
                             ),
                           ],
                         ),
-                        const Spacer(),
-                        FilledButton.icon(
-                          onPressed: _showAddTableDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Добавить стол'),
-                        ),
                       ],
                     ),
                   ),
@@ -1078,22 +1072,6 @@ class _TableCard extends StatelessWidget {
             tableNumber == '—' ? 'Без стола' : 'Стол $tableNumber',
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoChip(
-                icon: Icons.chair_alt_outlined,
-                label: '${table.seats} мест',
-              ),
-              if ((table.zone ?? '').isNotEmpty)
-                _InfoChip(
-                  icon: Icons.place_outlined,
-                  label: table.zone ?? '',
-                ),
-            ],
-          ),
           const SizedBox(height: 12),
           if (hasApiOrder && lastOrder != null)
             _OrderBadge(
@@ -1147,54 +1125,7 @@ class _TableCard extends StatelessWidget {
                   ),
                 ),
               ),
-            const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: (tableNumber == '—' ||
-                          table.status != 'free' ||
-                          hasApiOrder ||
-                          reservation != null)
-                      ? null
-                      : () => _openCreateOrder(context),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Новый заказ'),
-                ),
-              ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: cs.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.primary,
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ],
       ),
@@ -2377,20 +2308,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Text(
-              'Это демо-версия CRM системы. Данные могут быть тестовыми и '
-              'очищаться при обновлении или переустановке приложения.',
-            ),
-          ),
+          ),  
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
