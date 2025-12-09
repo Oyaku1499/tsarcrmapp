@@ -1,4 +1,6 @@
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'api_client.dart';
 
@@ -49,10 +51,20 @@ class _WaiterAppState extends State<WaiterApp> {
   bool _isDarkMode = true;
 
   double _scaleForSize(Size size) {
-    const baseWidth = 390.0; // ширина макета
-    final width = size.shortestSide;
-    final factor = width / baseWidth;
-    return factor.clamp(0.85, 1.25);
+    const baseWidth = 390.0; // ширина макета (iPhone 14)
+    const baseHeight = 844.0; // высота макета
+
+    final shortest = size.shortestSide;
+    final longest = size.longestSide;
+
+    // Берём минимальный коэффициент по ширине и высоте, чтобы
+    // на невысоких/узких экранах интерфейс уменьшался.
+    final widthFactor = shortest / baseWidth;
+    final heightFactor = longest / baseHeight;
+    final factor = math.min(widthFactor, heightFactor);
+
+    // Чуть расширяем диапазон, чтобы компактные смартфоны получали заметное сжатие.
+    return factor.clamp(0.7, 1.15);
   }
 
   @override
