@@ -886,7 +886,7 @@ class _TableCard extends StatelessWidget {
                   ],
                 ),
               ),
-            actions: [
+              actions: [
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(false),
                   child: const Text('Отмена'),
@@ -899,6 +899,8 @@ class _TableCard extends StatelessWidget {
             );
           },
         );
+      },
+    );
 
     return result == true;
   }
