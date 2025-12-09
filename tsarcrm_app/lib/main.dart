@@ -747,6 +747,17 @@ class _TableCard extends StatelessWidget {
     }
   }
 
+  String _formatReservationTime(String raw) {
+    if (raw.isEmpty) return '';
+
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+
+    final dt = parsed.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(dt.day)}.${two(dt.month)}.${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
   Future<void> _openCreateOrder(BuildContext context) async {
     if (tableNumber == '—') return;
 
@@ -935,7 +946,10 @@ class _TableCard extends StatelessWidget {
   Future<void> _openReservationDetails(BuildContext context) async {
     final reservation = table.reservation;
     
+
     if (reservation == null) return;
+
+    final formattedTime = _formatReservationTime(reservation.time);
 
     await showDialog<void>(
       context: context,
@@ -953,7 +967,7 @@ class _TableCard extends StatelessWidget {
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 2),
-              Text(reservation.time),
+              Text(formattedTime.isEmpty ? reservation.time : formattedTime),
               const SizedBox(height: 8),
               const Text(
                 'Контакт (имя/телефон)',
@@ -1009,6 +1023,8 @@ class _TableCard extends StatelessWidget {
         tableItems.fold<double>(0, (sum, item) => sum + item.amount);
     final hasTableOrder = tableItems.isNotEmpty || tableTotal > 0;
     final statusColor = _statusColor(context);
+    final formattedReservationTime =
+        reservation != null ? _formatReservationTime(reservation.time) : '';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1091,7 +1107,7 @@ class _TableCard extends StatelessWidget {
             _OrderBadge(
               title: 'Бронь',
               subtitle:
-                  'Время: ${reservation.time} • Гостей: ${reservation.guests}',
+                   '${formattedReservationTime.isEmpty ? reservation.time : formattedReservationTime} • Гостей: ${reservation.guests}',
               accent: cs.tertiary,
               onTap: () => _openReservationDetails(context),
             )
