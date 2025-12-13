@@ -30,6 +30,38 @@ extension ScaleExtension on num {
   double scaled(BuildContext context) => this * UiScale.of(context);
 }
 
+
+enum WindowSizeClass { compact, medium, expanded }
+
+WindowSizeClass windowClassFor(double width) {
+  if (width < 600) return WindowSizeClass.compact;
+  if (width < 1024) return WindowSizeClass.medium;
+  return WindowSizeClass.expanded;
+}
+
+/// Ограничивает ширину контента на больших экранах (планшеты/десктоп),
+/// чтобы интерфейс не "растекался" по всей ширине.
+class MaxWidth extends StatelessWidget {
+  const MaxWidth({super.key, required this.child, this.max = 720, this.padding});
+
+  final Widget child;
+  final double max;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final inner = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: max),
+      child: child,
+    );
+
+    return Center(
+      child: padding == null ? inner : Padding(padding: padding!, child: inner),
+    );
+  }
+}
+
+
 final globalApiClient = ApiClient();
 
 void main() {
@@ -63,8 +95,9 @@ class _WaiterAppState extends State<WaiterApp> {
     final heightFactor = longest / baseHeight;
     final factor = math.min(widthFactor, heightFactor);
 
-    // Чуть расширяем диапазон, чтобы компактные смартфоны получали заметное сжатие.
-    return factor.clamp(0.7, 1.15);
+    // Масштабируем только вниз, чтобы на больших экранах не появлялись
+    // переполнения из‑за увеличенных отступов и шрифтов.
+    return factor.clamp(0.75, 1.0);
   }
 
   @override
@@ -233,7 +266,10 @@ class _WaiterAppState extends State<WaiterApp> {
       builder: (context, child) {
         final mq = MediaQuery.of(context);
         final scale = _scaleForSize(mq.size);
-        final textScaler = TextScaler.linear(scale);
+        // Сохраняем системный масштаб шрифта (настройки доступности)
+// и умножаем его на наш коэффициент UI.
+final systemTextFactor = mq.textScaler.scale(14) / 14;
+final textScaler = TextScaler.linear(systemTextFactor * scale);
 
         return UiScale(
           factor: scale,
@@ -280,6 +316,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _loginCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+
+  // Compatibility aliases for older UI code that referenced these names.
+  TextEditingController get _emailCtrl => _loginCtrl;
+  TextEditingController get _passwordCtrl => _passCtrl;
+
+  bool _obscure = true;
   bool _loading = false;
   String? _error;
 
@@ -321,7 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
+          child: MaxWidth(max: 420, child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               24.scaled(context),
               24.scaled(context),
@@ -416,6 +458,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
+          ),
         ),
       ),
     );
@@ -449,7 +492,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
+    final List<Widget> screens = <Widget>[
       TablesScreen(apiClient: widget.apiClient),
       MenuScreen(apiClient: widget.apiClient),
       ProfileScreen(
@@ -468,33 +511,76 @@ class _HomeShellState extends State<HomeShell> {
         ),
         centerTitle: true,
       ),
-      body: IndexedStack(
-        index: _index,
-        children: screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        height: 68,
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.table_bar_outlined),
-            selectedIcon: Icon(Icons.table_bar),
-            label: 'Столы',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.restaurant_menu_outlined),
-            selectedIcon: Icon(Icons.restaurant_menu),
-            label: 'Меню',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Профиль',
-          ),
-        ],
-      ),
+      body: () {
+        final width = MediaQuery.sizeOf(context).width;
+        final wc = windowClassFor(width);
+        final useRail = wc != WindowSizeClass.compact;
+
+        final content = IndexedStack(
+          index: _index,
+          children: screens,
+        );
+
+        if (!useRail) return content;
+
+        return Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _index,
+              onDestinationSelected: (i) => setState(() => _index = i),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.table_bar_outlined),
+                  selectedIcon: Icon(Icons.table_bar),
+                  label: Text('Столы'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.restaurant_menu_outlined),
+                  selectedIcon: Icon(Icons.restaurant_menu),
+                  label: Text('Меню'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: Text('Профиль'),
+                ),
+              ],
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: content),
+          ],
+        );
+      }(),
+      bottomNavigationBar: () {
+        final width = MediaQuery.sizeOf(context).width;
+        final wc = windowClassFor(width);
+        if (wc != WindowSizeClass.compact) return null;
+
+        return NavigationBar(
+          height: 68,
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.table_bar_outlined),
+              selectedIcon: Icon(Icons.table_bar),
+              label: 'Столы',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.restaurant_menu_outlined),
+              selectedIcon: Icon(Icons.restaurant_menu),
+              label: 'Меню',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Профиль',
+            ),
+          ],
+        );
+      }(),
     );
   }
 }
@@ -637,153 +723,120 @@ class _TablesScreenState extends State<TablesScreen> {
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Stack(
       children: [
         RefreshIndicator(
           onRefresh: _reload,
-          child: FutureBuilder<_TablesData>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                String message = 'Ошибка загрузки столов';
-                final error = snapshot.error;
-                if (error is ApiException && error.statusCode == 401) {
-                  message = 'Ошибка авторизации (401). Проверьте логин и пароль в CRM.';
+          child: MaxWidth(
+            max: 1100,
+            child: FutureBuilder<_TablesData>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-                return ListView(
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Ошибка загрузки: ${snapshot.error}'),
+                    ),
+                  );
+                }
+
+                final data = snapshot.data!;
+                final tables = data.tables;
+                final orders = data.orders;
+
+                final q = _query.trim().toLowerCase();
+                final filtered = q.isEmpty
+                    ? tables
+                    : tables
+                        .where((t) => t.number.toLowerCase().contains(q))
+                        .toList();
+
+                return Column(
                   children: [
-                    const SizedBox(height: 80),
-                    Center(
-                      child: Text(
-                        message,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: cs.error),
-                      ),
-                    ),
-                  ],
-                );
-              }
-              final data = snapshot.data;
-              if (data == null || data.tables.isEmpty) {
-                return ListView(
-                  children: const [
-                    SizedBox(height: 80),
-                    Center(child: Text('Столов пока нет')),
-                  ],
-                );
-              }
-
-              const closedStatuses = {'completed', 'cancelled', 'deleted'};
-              final byTable = <String, List<ApiOrder>>{};
-              for (final o in data.orders) {
-                if (closedStatuses.contains(o.status)) continue;
-                final key = o.tableNumber ?? '';
-                if (key.isEmpty) continue;
-                byTable.putIfAbsent(key, () => []).add(o);
-              }
-
-              final tables = [...data.tables]
-                ..sort((a, b) => a.number.compareTo(b.number));
-
-              final query = _searchQuery.trim();
-              final filteredTables = query.isEmpty
-                  ? tables
-                  : tables
-                      .where((t) => t.number.toLowerCase().contains(query.toLowerCase()))
-                      .toList();
-
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Управление столами',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                    // Search & stats
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search_rounded),
+                                hintText: 'Поиск по номеру стола',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              onChanged: (v) => setState(() => _query = v),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Следите за статусом и создавайте заказы',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Поиск по номеру стола',
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final targetWidth = 260.scaled(context);
-                        final crossAxisCount =
-                            (constraints.maxWidth / targetWidth).floor().clamp(2, 4);
-
-                        return GridView.builder(
-                          padding: EdgeInsets.all(16.scaled(context)),
-                          itemCount: filteredTables.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 12.scaled(context),
-                            mainAxisSpacing: 12.scaled(context),
-                            childAspectRatio: 0.82,
                           ),
-                          itemBuilder: (context, index) {
-                            final table = filteredTables[index];
-                            final tableOrders =
-                                byTable[table.number] ?? const <ApiOrder>[];
-                            return _TableCard(
-                              apiClient: widget.apiClient,
-                              table: table,
-                              orders: tableOrders,
-                              onChanged: _reload,
-                            );
-                          },
-                        );
-                      },
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            onPressed: _reload,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Обновить'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Row(
+                        children: [
+                          _ChipStat(
+                            label: 'Всего',
+                            value: tables.length.toString(),
+                          ),
+                          const SizedBox(width: 8),
+                          _ChipStat(
+                            label: 'Показано',
+                            value: filtered.length.toString(),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(child: Text('Ничего не найдено'))
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              itemBuilder: (context, i) {
+                                final t = filtered[i];
+                                return _TableCard(
+                                  apiClient: widget.apiClient,
+                                  table: t,
+                                  orders: orders,
+                                  onChanged: _reload,
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
+        if (_loadingOverlay)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black26,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+          ),
       ],
     );
   }
+
 }
 
 class _TableCard extends StatelessWidget {
@@ -2246,7 +2299,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       )
                       .name);
 
-          return ListView(
+          return MaxWidth(max: 1000, child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               Container(
@@ -2502,6 +2555,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   );
                 }).toList(),
             ],
+          ),
           );
         },
       ),
@@ -2529,7 +2583,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return SingleChildScrollView(
+    return MaxWidth(max: 720, child: SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2667,6 +2721,7 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
